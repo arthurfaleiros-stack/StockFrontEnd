@@ -104,11 +104,11 @@ function RegisterPage() {
             style={{
               fontSize: '22px',
               fontWeight: '700',
-              color: '#ffffff',
               margin: '0',
             }}
           >
-            KeepStock
+            <span style={{ color: '#ffffff' }}>Keep</span>
+            <span style={{ color: '#7c80f8' }}>Stock</span>
           </h1>
 
           <p
@@ -118,7 +118,7 @@ function RegisterPage() {
               margin: '4px 0 0',
             }}
           >
-            Sistema de Gestão de Estoque
+            Plataforma Integrada de Gestão de Inventário
           </p>
         </div>
 
@@ -131,8 +131,9 @@ function RegisterPage() {
             margin: '0 0 16px',
           }}
         >
-          Criar conta
+          Criar conta corporativa
         </h2>
+        
 
         {/* Erro da API */}
         {apiError && (

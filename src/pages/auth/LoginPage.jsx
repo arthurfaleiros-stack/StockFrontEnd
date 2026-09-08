@@ -83,16 +83,17 @@ function LoginPage() {
             marginBottom: '24px',
           }}
         >
-          <h1
+           <h1
             style={{
               fontSize: '22px',
               fontWeight: '700',
-              color: '#ffffff',
               margin: '0',
             }}
           >
-            KeepStock
+            <span style={{ color: '#ffffff' }}>Keep</span>
+            <span style={{ color: '#7c80f8' }}>Stock</span>
           </h1>
+
 
           <p
             style={{
