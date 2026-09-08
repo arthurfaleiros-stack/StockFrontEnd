@@ -101,7 +101,7 @@ function LoginPage() {
               margin: '4px 0 0',
             }}
           >
-            Sistema de controle de estoque
+            Acesse seu painel com as credenciais corporativas
           </p>
         </div>
 
@@ -114,7 +114,7 @@ function LoginPage() {
             margin: '0 0 16px',
           }}
         >
-          Entrar
+          Bem-Vindo de volta
         </h2>
 
         {/* Mensagem de sucesso */}
@@ -256,7 +256,7 @@ function LoginPage() {
             )}
           </div>
 
-          {/* Esqueci minha senha */}
+    
           <div
             style={{
               textAlign: 'right',
