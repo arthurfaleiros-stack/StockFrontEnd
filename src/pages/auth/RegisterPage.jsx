@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import { isValidEmail } from '../../utils/validators';
 
-export function RegisterPage() {
+function RegisterPage() {
   const navigate = useNavigate();
   const { register } = useAuth();
 
@@ -73,49 +73,100 @@ export function RegisterPage() {
 
   return (
     <div
-      className="auth-page"
       style={{
         minHeight: '100vh',
-        background:
-          'radial-gradient(circle at center, #18213b 0%, #0d1426 45%, #070b16 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#0f172a',
+        padding: '24px',
       }}
     >
       <div
-        className="auth-card"
         style={{
-          backgroundColor: '#151d33',
-          border: '1px solid #252f49',
+          width: '100%',
+          maxWidth: '400px',
+          backgroundColor: '#1e293b',
+          border: '1px solid #334155',
           borderRadius: '12px',
-          color: '#ffffff',
+          padding: '32px',
+          boxSizing: 'border-box',
         }}
       >
-        <div className="auth-logo">
-          <h1 style={{ color: '#ffffff' }}>KeepStock</h1>
+        {/* Logo */}
+        <div
+          style={{
+            textAlign: 'center',
+            marginBottom: '24px',
+          }}
+        >
+          <h1
+            style={{
+              fontSize: '22px',
+              fontWeight: '700',
+              color: '#ffffff',
+              margin: '0',
+            }}
+          >
+            KeepStock
+          </h1>
 
-          <p style={{ color: '#ffffff' }}>
+          <p
+            style={{
+              fontSize: '13px',
+              color: '#cbd5e1',
+              margin: '4px 0 0',
+            }}
+          >
             Sistema de Gestão de Estoque
           </p>
         </div>
 
+        {/* Título */}
         <h2
-          className="auth-title"
-          style={{ color: '#ffffff' }}
+          style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#ffffff',
+            margin: '0 0 16px',
+          }}
         >
           Criar conta
         </h2>
 
+        {/* Erro da API */}
         {apiError && (
-          <div className="alert alert-error">
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              marginBottom: '16px',
+              backgroundColor: '#450a0a',
+              color: '#fecaca',
+              border: '1px solid #991b1b',
+            }}
+          >
             {apiError}
           </div>
         )}
 
         <form onSubmit={handleSubmit} noValidate>
-
-          <div className="form-group">
+          {/* Nome */}
+          <div
+            style={{
+              marginBottom: '16px',
+            }}
+          >
             <label
               htmlFor="nome"
-              style={{ color: '#ffffff' }}
+              style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: '6px',
+              }}
             >
               Nome completo
             </label>
@@ -127,22 +178,49 @@ export function RegisterPage() {
               onChange={(e) => setNome(e.target.value)}
               placeholder="Ex: Maria Silva"
               style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                border: errors.nome
+                  ? '1px solid #dc2626'
+                  : '1px solid #475569',
+                borderRadius: '8px',
                 color: '#ffffff',
-                backgroundColor: '#0d1426',
+                backgroundColor: '#0f172a',
+                boxSizing: 'border-box',
+                outline: 'none',
               }}
             />
 
             {errors.nome && (
-              <p className="form-error">
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: '#fca5a5',
+                  marginTop: '4px',
+                  marginBottom: '0',
+                }}
+              >
                 {errors.nome}
               </p>
             )}
           </div>
 
-          <div className="form-group">
+          {/* E-mail */}
+          <div
+            style={{
+              marginBottom: '16px',
+            }}
+          >
             <label
               htmlFor="email"
-              style={{ color: '#ffffff' }}
+              style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: '6px',
+              }}
             >
               E-mail
             </label>
@@ -154,22 +232,49 @@ export function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="seu.email@empresa.com"
               style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                border: errors.email
+                  ? '1px solid #dc2626'
+                  : '1px solid #475569',
+                borderRadius: '8px',
                 color: '#ffffff',
-                backgroundColor: '#0d1426',
+                backgroundColor: '#0f172a',
+                boxSizing: 'border-box',
+                outline: 'none',
               }}
             />
 
             {errors.email && (
-              <p className="form-error">
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: '#fca5a5',
+                  marginTop: '4px',
+                  marginBottom: '0',
+                }}
+              >
                 {errors.email}
               </p>
             )}
           </div>
 
-          <div className="form-group">
+          {/* Senha */}
+          <div
+            style={{
+              marginBottom: '16px',
+            }}
+          >
             <label
               htmlFor="senha"
-              style={{ color: '#ffffff' }}
+              style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: '6px',
+              }}
             >
               Senha
             </label>
@@ -181,22 +286,49 @@ export function RegisterPage() {
               onChange={(e) => setSenha(e.target.value)}
               placeholder="Mínimo de 6 caracteres"
               style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                border: errors.senha
+                  ? '1px solid #dc2626'
+                  : '1px solid #475569',
+                borderRadius: '8px',
                 color: '#ffffff',
-                backgroundColor: '#0d1426',
+                backgroundColor: '#0f172a',
+                boxSizing: 'border-box',
+                outline: 'none',
               }}
             />
 
             {errors.senha && (
-              <p className="form-error">
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: '#fca5a5',
+                  marginTop: '4px',
+                  marginBottom: '0',
+                }}
+              >
                 {errors.senha}
               </p>
             )}
           </div>
 
-          <div className="form-group">
+          {/* Confirmar senha */}
+          <div
+            style={{
+              marginBottom: '16px',
+            }}
+          >
             <label
               htmlFor="confirmarSenha"
-              style={{ color: '#ffffff' }}
+              style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: '6px',
+              }}
             >
               Confirmar senha
             </label>
@@ -208,33 +340,73 @@ export function RegisterPage() {
               onChange={(e) => setConfirmarSenha(e.target.value)}
               placeholder="Digite a senha novamente"
               style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                border: errors.confirmarSenha
+                  ? '1px solid #dc2626'
+                  : '1px solid #475569',
+                borderRadius: '8px',
                 color: '#ffffff',
-                backgroundColor: '#0d1426',
+                backgroundColor: '#0f172a',
+                boxSizing: 'border-box',
+                outline: 'none',
               }}
             />
 
             {errors.confirmarSenha && (
-              <p className="form-error">
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: '#fca5a5',
+                  marginTop: '4px',
+                  marginBottom: '0',
+                }}
+              >
                 {errors.confirmarSenha}
               </p>
             )}
           </div>
 
+          {/* Botão */}
           <button
             type="submit"
-            className="btn-primary"
             disabled={isSubmitting}
+            style={{
+              width: '100%',
+              padding: '11px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#ffffff',
+              backgroundColor: isSubmitting ? '#6366f1' : '#4f46e5',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            }}
           >
             {isSubmitting ? 'Cadastrando...' : 'Cadastrar'}
           </button>
         </form>
 
+        {/* Rodapé */}
         <p
-          className="auth-footer"
-          style={{ color: '#ffffff' }}
+          style={{
+            textAlign: 'center',
+            marginTop: '20px',
+            fontSize: '13px',
+            color: '#cbd5e1',
+          }}
         >
           Já tem uma conta?{' '}
-          <Link to="/login">
+
+          <Link
+            to="/login"
+            style={{
+              color: '#a5b4fc',
+              fontWeight: '600',
+              textDecoration: 'none',
+            }}
+          >
             Entrar
           </Link>
         </p>
