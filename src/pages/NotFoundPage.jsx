@@ -18,9 +18,9 @@ export function NotFoundPage() {
       <p className="text-sm text-slate-400 max-w-md mb-8 leading-relaxed">
         O recurso ou rota que você tentou acessar não existe ou foi movido para outro endereço.
       </p>
-      <Link to="/dashboard">
+      <Link to="/login">
         <Button variant="primary" icon={Home} size="lg">
-          Voltar ao Dashboard
+          Voltar ao Login
         </Button>
       </Link>
     </div>

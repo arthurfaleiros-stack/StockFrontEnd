@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import { isValidEmail } from '../../utils/validators';
-import './Auth.css';
 
-export function LoginPage() {
+function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
 
-  // Mensagem que pode vir de outra tela (ex: depois de cadastrar)
   const successMessage = location.state?.message;
 
   const [email, setEmail] = useState('');
@@ -20,12 +18,19 @@ export function LoginPage() {
 
   function validate() {
     const newErrors = {};
-    if (!email.trim()) newErrors.email = 'Informe o e-mail.';
-    else if (!isValidEmail(email)) newErrors.email = 'E-mail inválido.';
 
-    if (!senha) newErrors.senha = 'Informe a senha.';
+    if (!email.trim()) {
+      newErrors.email = 'Informe o e-mail.';
+    } else if (!isValidEmail(email)) {
+      newErrors.email = 'E-mail inválido.';
+    }
+
+    if (!senha) {
+      newErrors.senha = 'Informe a senha.';
+    }
 
     setErrors(newErrors);
+
     return Object.keys(newErrors).length === 0;
   }
 
@@ -36,7 +41,9 @@ export function LoginPage() {
     if (!validate()) return;
 
     setIsSubmitting(true);
+
     const result = await login(email, senha);
+
     setIsSubmitting(false);
 
     if (!result.success) {
@@ -48,58 +55,271 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <h1>KeepStock</h1>
-          <p>Sistema de Gestão de Estoque</p>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#0f172a',
+        padding: '24px',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '400px',
+          backgroundColor: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          padding: '32px',
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Logo */}
+        <div
+          style={{
+            textAlign: 'center',
+            marginBottom: '24px',
+          }}
+        >
+          <h1
+            style={{
+              fontSize: '22px',
+              fontWeight: '700',
+              color: '#ffffff',
+              margin: '0',
+            }}
+          >
+            KeepStock
+          </h1>
+
+          <p
+            style={{
+              fontSize: '13px',
+              color: '#cbd5e1',
+              margin: '4px 0 0',
+            }}
+          >
+            Sistema de controle de estoque
+          </p>
         </div>
 
-        <h2 className="auth-title">Entrar</h2>
+        {/* Título */}
+        <h2
+          style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#ffffff',
+            margin: '0 0 16px',
+          }}
+        >
+          Entrar
+        </h2>
 
-        {successMessage && <div className="alert alert-success">{successMessage}</div>}
-        {apiError && <div className="alert alert-error">{apiError}</div>}
+        {/* Mensagem de sucesso */}
+        {successMessage && (
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              marginBottom: '16px',
+              backgroundColor: '#14532d',
+              color: '#bbf7d0',
+              border: '1px solid #166534',
+            }}
+          >
+            {successMessage}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="form-group">
-            <label htmlFor="email">E-mail</label>
+        {/* Erro da API */}
+        {apiError && (
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              marginBottom: '16px',
+              backgroundColor: '#450a0a',
+              color: '#fecaca',
+              border: '1px solid #991b1b',
+            }}
+          >
+            {apiError}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {/* E-mail */}
+          <div
+            style={{
+              marginBottom: '16px',
+            }}
+          >
+            <label
+              style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: '6px',
+              }}
+            >
+              E-mail
+            </label>
+
             <input
-              id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu.email@empresa.com"
+              placeholder="Digite seu e-mail"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                border: errors.email
+                  ? '1px solid #dc2626'
+                  : '1px solid #475569',
+                borderRadius: '8px',
+                color: '#ffffff',
+                backgroundColor: '#0f172a',
+                boxSizing: 'border-box',
+                outline: 'none',
+              }}
             />
-            {errors.email && <p className="form-error">{errors.email}</p>}
+
+            {errors.email && (
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: '#fca5a5',
+                  marginTop: '4px',
+                  marginBottom: '0',
+                }}
+              >
+                {errors.email}
+              </p>
+            )}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="senha">Senha</label>
+          {/* Senha */}
+          <div
+            style={{
+              marginBottom: '16px',
+            }}
+          >
+            <label
+              style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#ffffff',
+                marginBottom: '6px',
+              }}
+            >
+              Senha
+            </label>
+
             <input
-              id="senha"
               type="password"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               placeholder="Digite sua senha"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: '14px',
+                border: errors.senha
+                  ? '1px solid #dc2626'
+                  : '1px solid #475569',
+                borderRadius: '8px',
+                color: '#ffffff',
+                backgroundColor: '#0f172a',
+                boxSizing: 'border-box',
+                outline: 'none',
+              }}
             />
-            {errors.senha && <p className="form-error">{errors.senha}</p>}
+
+            {errors.senha && (
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: '#fca5a5',
+                  marginTop: '4px',
+                  marginBottom: '0',
+                }}
+              >
+                {errors.senha}
+              </p>
+            )}
           </div>
 
-          <p style={{ textAlign: 'right', marginBottom: 16 }}>
-            <Link to="/esqueci-senha" className="btn-link">Esqueceu a senha?</Link>
-          </p>
+          {/* Esqueci minha senha */}
+          <div
+            style={{
+              textAlign: 'right',
+              marginBottom: '16px',
+            }}
+          >
+            <Link
+              to="/recuperar-senha"
+              style={{
+                color: '#a5b4fc',
+                fontSize: '13px',
+                fontWeight: '600',
+                textDecoration: 'none',
+              }}
+            >
+              Esqueci minha senha
+            </Link>
+          </div>
 
-          <button type="submit" className="btn-primary" disabled={isSubmitting}>
+          {/* Botão */}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            style={{
+              width: '100%',
+              padding: '11px',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#ffffff',
+              backgroundColor: isSubmitting ? '#6366f1' : '#4f46e5',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            }}
+          >
             {isSubmitting ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
 
-        <p className="auth-footer">
-          Não tem uma conta? <Link to="/cadastro">Cadastre-se</Link>
-        </p>
+        {/* Rodapé */}
+        <div
+          style={{
+            textAlign: 'center',
+            marginTop: '20px',
+            fontSize: '13px',
+            color: '#cbd5e1',
+          }}
+        >
+          Ainda não possui uma conta?{' '}
+
+          <Link
+            to="/cadastro"
+            style={{
+              color: '#a5b4fc',
+              fontWeight: '600',
+              textDecoration: 'none',
+            }}
+          >
+            Criar conta
+          </Link>
+        </div>
       </div>
     </div>
   );
 }
-
 export default LoginPage;

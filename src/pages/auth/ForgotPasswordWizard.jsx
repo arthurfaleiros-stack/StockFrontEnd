@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import authService from '../../api/auth';
 import { getErrorMessage } from '../../utils/errorParser';
 import { isValidEmail } from '../../utils/validators';
-import './Auth.css';
+
 
 // Tela de "Esqueci minha senha", dividida em 3 passos simples:
 // 1) informar o e-mail  2) digitar o código recebido  3) criar a nova senha

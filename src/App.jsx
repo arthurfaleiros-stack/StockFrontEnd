@@ -27,8 +27,7 @@ export function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* ROTAS PÚBLICAS / GUEST (apenas não autenticados) */}
-          <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/cadastro" element={<GuestRoute><RegisterPage /></GuestRoute>} />
           <Route path="/esqueci-senha" element={<GuestRoute><ForgotPasswordWizard /></GuestRoute>} />
 
@@ -40,7 +39,7 @@ export function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
 
             {/* Acessível a ADMIN, GERENTE e OPERADOR */}
             <Route path="/dashboard" element={<DashboardPage />} />
