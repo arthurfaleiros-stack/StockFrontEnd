@@ -38,10 +38,7 @@ export const authService = {
     return response.data;
   },
 
-  /**
-   * Solicita envio de código de 6 dígitos para o e-mail
-   * POST /api/v1/auth/forgot-password (email)
-   */
+  /** Protótipo para solicitar redefinição de senha, lógica exige o código enviado ao email */
   async forgotPassword(email) {
     const response = await apiClient.post('/api/v1/auth/forgot-password', {
       email: email.trim(),
@@ -50,8 +47,7 @@ export const authService = {
   },
 
   /**
-   * Valida o código de 6 dígitos recebido por e-mail
-   * POST /api/v1/auth/verify-reset-code (email, codigo)
+   protótipo para verficar o código enviado ao email do usuário para redefinição de senha
    */
   async verifyResetCode(email, codigo) {
     const response = await apiClient.post('/api/v1/auth/verify-reset-code', {
@@ -62,8 +58,8 @@ export const authService = {
   },
 
   /**
-   * Redefine a senha do usuário utilizando e-mail e código validado
-   * POST /api/v1/auth/reset-password (email, codigo, novaSenha)
+    protótipo para redefinir a senha do usuário, lógica exige o código e o email do usuário, 
+    e depois altera a senha para a nova senha informada
    */
   async resetPassword(email, codigo, novaSenha) {
     const response = await apiClient.post('/api/v1/auth/reset-password', {
