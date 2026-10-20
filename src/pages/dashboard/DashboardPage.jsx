@@ -20,33 +20,47 @@ import inventoryService from '../../api/inventory';
 export function DashboardPage() {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState({
-    totalProdutos: 148,
-    valorTotalEstoque: 284500.0,
-    itensEstoqueBaixo: 12,
-    movimentacoesHoje: 24,
+    totalProdutos: 0,
+    totalEstoqueFisico: 0,
+    itensEstoqueBaixo: 0,
+    movimentacoesTotal: 0,
   });
 
-  const [recentMovements, setRecentMovements] = useState([
-    { id: 1, tipo: 'ENTRADA', produto: 'Sensor Fotoelétrico Industrial', quantidade: 50, responsavel: 'Carlos Lima', data: 'Hoje às 14:32' },
-    { id: 2, tipo: 'SAIDA', produto: 'Cabo Blindado 4 Vias 100m', quantidade: 12, responsavel: 'Arthur Faleiros', data: 'Hoje às 12:15' },
-    { id: 3, tipo: 'SAIDA', produto: 'Controlador Lógico Programável (CLP)', quantidade: 2, responsavel: 'Mariana Costa', data: 'Hoje às 10:45' },
-    { id: 4, tipo: 'ENTRADA', produto: 'Fonte Chaveada 24V 10A', quantidade: 30, responsavel: 'Arthur Faleiros', data: 'Ontem às 17:00' },
-  ]);
+  const [recentMovements, setRecentMovements] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     async function loadData() {
       try {
-        const summary = await inventoryService.getDashboardSummary();
-        if (summary && mounted) {
-          setMetrics(summary);
-        }
-        const movs = await inventoryService.getMovimentacoes({ limit: 5 });
-        if (movs && Array.isArray(movs) && mounted) {
+        setLoading(true);
+        const [prodRes, movRes] = await Promise.all([
+          inventoryService.getProdutos({ limit: 100 }),
+          inventoryService.getMovimentacoes({ limit: 5 }),
+        ]);
+
+        const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
+        const movs = movRes?.data || (Array.isArray(movRes) ? movRes : []);
+
+        if (mounted) {
+          const totalQtd = prods.reduce((acc, p) => acc + (Number(p.quantidade_atual) || 0), 0);
+          const baixo = prods.filter(
+            (p) => Number(p.quantidade_atual || 0) <= Number(p.quantidade_minima || 0)
+          ).length;
+
+          setMetrics({
+            totalProdutos: prodRes?.pagination?.total ?? prods.length,
+            totalEstoqueFisico: totalQtd,
+            itensEstoqueBaixo: baixo,
+            movimentacoesTotal: movRes?.pagination?.total ?? movs.length,
+          });
+
           setRecentMovements(movs);
         }
       } catch (err) {
-        console.warn('Utilizando dados estruturados para renderização do Dashboard:', err);
+        console.warn('Erro ao carregar dados do Dashboard:', err);
+      } finally {
+        if (mounted) setLoading(false);
       }
     }
     loadData();
@@ -108,11 +122,11 @@ export function DashboardPage() {
           <p className="text-[11px] text-slate-400 mt-2">Itens com SKU cadastrado no catálogo</p>
         </div>
 
-        {/* Card 2: Valor em Estoque */}
+        {/* Card 2: Total em Estoque Físico */}
         <div className="bg-[#0e162c] border border-[#1d294d] rounded-2xl p-5 shadow-lg">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Valor em Estoque
+              Estoque Físico Total
             </span>
             <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
               <TrendingUp className="w-5 h-5" />
@@ -120,10 +134,11 @@ export function DashboardPage() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-extrabold text-white">
-              R$ {Number(metrics.valorTotalEstoque).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {Number(metrics.totalEstoqueFisico).toLocaleString('pt-BR')}
             </span>
+            <span className="text-xs text-indigo-300 font-medium">unidades</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Valor patrimonial de mercadorias ativas</p>
+          <p className="text-[11px] text-slate-400 mt-2">Volume consolidado de itens em estoque</p>
         </div>
 
         {/* Card 3: Alertas de Estoque Baixo */}
@@ -145,11 +160,11 @@ export function DashboardPage() {
           <p className="text-[11px] text-slate-400 mt-2">Abaixo do ponto de pedido configurado</p>
         </div>
 
-        {/* Card 4: Movimentações Hoje */}
+        {/* Card 4: Movimentações Registradas */}
         <div className="bg-[#0e162c] border border-[#1d294d] rounded-2xl p-5 shadow-lg">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Movimentações Hoje
+              Total de Movimentações
             </span>
             <div className="w-9 h-9 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
               <ArrowLeftRight className="w-5 h-5" />
@@ -157,11 +172,11 @@ export function DashboardPage() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-extrabold text-white">
-              {metrics.movimentacoesHoje}
+              {metrics.movimentacoesTotal}
             </span>
-            <span className="text-xs text-slate-400 font-medium">operações</span>
+            <span className="text-xs text-slate-400 font-medium">operações auditadas</span>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">Entradas e saídas registradas na data</p>
+          <p className="text-[11px] text-slate-400 mt-2">Entradas, saídas e ajustes no armazém</p>
         </div>
       </div>
 
@@ -195,38 +210,57 @@ export function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#17223e]">
-                  {recentMovements.map((mov) => (
-                    <tr key={mov.id} className="hover:bg-[#121c38]/50 transition-colors">
-                      <td className="py-3.5">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
-                            mov.tipo === 'ENTRADA'
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                          }`}
-                        >
-                          {mov.tipo === 'ENTRADA' ? (
-                            <ArrowDownRight className="w-3 h-3" />
-                          ) : (
-                            <ArrowUpRight className="w-3 h-3" />
-                          )}
-                          {mov.tipo}
-                        </span>
-                      </td>
-                      <td className="py-3.5 font-medium text-slate-200">
-                        {mov.produto}
-                      </td>
-                      <td className="py-3.5 text-center font-mono font-bold text-white">
-                        {mov.quantidade}
-                      </td>
-                      <td className="py-3.5 text-xs text-slate-400">
-                        {mov.responsavel}
-                      </td>
-                      <td className="py-3.5 text-right text-xs text-slate-400">
-                        {mov.data}
+                  {recentMovements.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                        Nenhuma movimentação registrada até o momento.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    recentMovements.map((mov) => (
+                      <tr key={mov.id} className="hover:bg-[#121c38]/50 transition-colors">
+                        <td className="py-3.5">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                              mov.tipo === 'ENTRADA'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : mov.tipo === 'SAIDA'
+                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                            }`}
+                          >
+                            {mov.tipo === 'ENTRADA' ? (
+                              <ArrowDownRight className="w-3 h-3" />
+                            ) : mov.tipo === 'SAIDA' ? (
+                              <ArrowUpRight className="w-3 h-3" />
+                            ) : (
+                              <ArrowLeftRight className="w-3 h-3" />
+                            )}
+                            {mov.tipo}
+                          </span>
+                        </td>
+                        <td className="py-3.5 font-medium text-slate-200">
+                          {mov.produto_nome || mov.produto}
+                        </td>
+                        <td className="py-3.5 text-center font-mono font-bold text-white">
+                          {mov.quantidade} un
+                        </td>
+                        <td className="py-3.5 text-xs text-slate-400">
+                          {mov.usuario_nome || mov.responsavel || 'Sistema'}
+                        </td>
+                        <td className="py-3.5 text-right text-xs text-slate-400 font-mono">
+                          {mov.data_hora
+                            ? new Date(mov.data_hora).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : mov.data}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

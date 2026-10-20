@@ -6,12 +6,8 @@ import apiClient from './client';
 export const inventoryService = {
   // Produtos
   async getProdutos(params = {}) {
-    try {
-      const res = await apiClient.get('/api/v1/produtos', { params });
-      return res.data;
-    } catch {
-      return null;
-    }
+    const res = await apiClient.get('/api/v1/produtos', { params });
+    return res.data;
   },
 
   async getProdutoById(id) {
@@ -24,14 +20,20 @@ export const inventoryService = {
     return res.data;
   },
 
+  async updateProduto(id, data) {
+    const res = await apiClient.put(`/api/v1/produtos/${id}`, data);
+    return res.data;
+  },
+
+  async deleteProduto(id) {
+    const res = await apiClient.delete(`/api/v1/produtos/${id}`);
+    return res.data;
+  },
+
   // Movimentações
   async getMovimentacoes(params = {}) {
-    try {
-      const res = await apiClient.get('/api/v1/movimentacoes', { params });
-      return res.data;
-    } catch {
-      return null;
-    }
+    const res = await apiClient.get('/api/v1/movimentacoes', { params });
+    return res.data;
   },
 
   async createMovimentacao(data) {
@@ -40,53 +42,63 @@ export const inventoryService = {
   },
 
   // Categorias
-  async getCategorias() {
-    try {
-      const res = await apiClient.get('/api/v1/categorias');
-      return res.data;
-    } catch {
-      return null;
-    }
+  async getCategorias(params = {}) {
+    const res = await apiClient.get('/api/v1/categorias', { params });
+    return res.data;
+  },
+
+  async createCategoria(data) {
+    const res = await apiClient.post('/api/v1/categorias', data);
+    return res.data;
+  },
+
+  async updateCategoria(id, data) {
+    const res = await apiClient.put(`/api/v1/categorias/${id}`, data);
+    return res.data;
+  },
+
+  async deleteCategoria(id) {
+    const res = await apiClient.delete(`/api/v1/categorias/${id}`);
+    return res.data;
   },
 
   // Fornecedores
-  async getFornecedores() {
-    try {
-      const res = await apiClient.get('/api/v1/fornecedores');
-      return res.data;
-    } catch {
-      return null;
-    }
+  async getFornecedores(params = {}) {
+    const res = await apiClient.get('/api/v1/fornecedores', { params });
+    return res.data;
+  },
+
+  async createFornecedor(data) {
+    const res = await apiClient.post('/api/v1/fornecedores', data);
+    return res.data;
+  },
+
+  async updateFornecedor(id, data) {
+    const res = await apiClient.put(`/api/v1/fornecedores/${id}`, data);
+    return res.data;
+  },
+
+  async deleteFornecedor(id) {
+    const res = await apiClient.delete(`/api/v1/fornecedores/${id}`);
+    return res.data;
   },
 
   // Histórico / Auditoria
   async getHistorico(params = {}) {
-    try {
-      const res = await apiClient.get('/api/v1/historico', { params });
-      return res.data;
-    } catch {
-      return null;
-    }
+    const res = await apiClient.get('/api/v1/historico', { params });
+    return res.data;
   },
 
   // Usuários (ADMIN)
   async getUsuarios() {
-    try {
-      const res = await apiClient.get('/api/v1/usuarios');
-      return res.data;
-    } catch {
-      return null;
-    }
+    const res = await apiClient.get('/api/v1/usuarios');
+    return res.data;
   },
 
   // Métricas do Dashboard
   async getDashboardSummary() {
-    try {
-      const res = await apiClient.get('/api/v1/dashboard/resumo');
-      return res.data;
-    } catch {
-      return null;
-    }
+    const res = await apiClient.get('/api/v1/dashboard/resumo');
+    return res.data;
   },
 };
 
