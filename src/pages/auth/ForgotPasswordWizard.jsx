@@ -11,9 +11,9 @@ import {
   EyeOff,
   ArrowLeft,
   Check,
-  Copy,
   CheckCircle2,
   AlertCircle,
+  Inbox,
 } from 'lucide-react';
 
 export function ForgotPasswordWizard() {
@@ -30,15 +30,13 @@ export function ForgotPasswordWizard() {
   // Auxiliares de UI
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
-  const [tokenCopiado, setTokenCopiado] = useState(false);
-  const [tokenDev, setTokenDev] = useState('');
 
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Se o usuário acessar com token pela URL (ex: ?token=xyz&email=teste@kstock.com)
+  // Se o usuário clicar diretamente no link recebido no e-mail (ex: ?token=xyz&email=teste@empresa.com)
   useEffect(() => {
     const urlToken = searchParams.get('token');
     const urlEmail = searchParams.get('email');
@@ -50,7 +48,7 @@ export function ForgotPasswordWizard() {
     if (urlToken) {
       setToken(urlToken);
       setStep(2);
-      setInfoMessage('Token de recuperação detectado. Agora defina sua nova senha.');
+      setInfoMessage('Link de e-mail validado. Agora defina sua nova senha.');
     }
   }, [searchParams]);
 
@@ -70,7 +68,7 @@ export function ForgotPasswordWizard() {
   function validateStep2() {
     const newErrors = {};
     if (!token.trim()) {
-      newErrors.token = 'Informe o token de recuperação.';
+      newErrors.token = 'Informe o token recebido no seu e-mail.';
     }
     if (!novaSenha) {
       newErrors.novaSenha = 'A nova senha é obrigatória.';
@@ -98,15 +96,12 @@ export function ForgotPasswordWizard() {
     try {
       const response = await authService.solicitarReset(email);
       setInfoMessage(
-        response.message || 'Se o e-mail estiver cadastrado, você receberá as instruções para redefinição.'
+        response.message ||
+          `Enviamos um e-mail com as instruções para ${email}. Verifique sua caixa de entrada e pasta de spam para pegar o token.`
       );
 
-      // Se o backend retornou o token (modo de demonstração/desenvolvimento)
-      if (response.token) {
-        setTokenDev(response.token);
-        setToken(response.token);
-      }
-
+      // O token NÃO é preenchido aqui: o usuário DEVE consultar seu e-mail real!
+      setToken('');
       setStep(2);
     } catch (error) {
       setApiError(getErrorMessage(error));
@@ -134,13 +129,6 @@ export function ForgotPasswordWizard() {
       setApiError(getErrorMessage(error));
       setIsSubmitting(false);
     }
-  }
-
-  function handleCopiarToken() {
-    if (!tokenDev) return;
-    navigator.clipboard.writeText(tokenDev);
-    setTokenCopiado(true);
-    setTimeout(() => setTokenCopiado(false), 2500);
   }
 
   return (
@@ -214,7 +202,7 @@ export function ForgotPasswordWizard() {
                 color: step === 1 ? '#ffffff' : '#94a3b8',
               }}
             >
-              Solicitar Token
+              E-mail
             </span>
           </div>
 
@@ -251,12 +239,12 @@ export function ForgotPasswordWizard() {
                 color: step === 2 ? '#ffffff' : '#64748b',
               }}
             >
-              Nova Senha
+              Validação & Senha
             </span>
           </div>
         </div>
 
-        {/* Mensagem Informativa */}
+        {/* Mensagem Informativa de Envio de E-mail */}
         {infoMessage && (
           <div
             style={{
@@ -272,79 +260,8 @@ export function ForgotPasswordWizard() {
               gap: '8px',
             }}
           >
-            <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <Inbox size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
             <span>{infoMessage}</span>
-          </div>
-        )}
-
-        {/* Banner de Demonstração / Token Gerado */}
-        {tokenDev && step === 2 && (
-          <div
-            style={{
-              padding: '12px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              marginBottom: '16px',
-              backgroundColor: '#1e1b4b',
-              color: '#c7d2fe',
-              border: '1px solid #4338ca',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '6px',
-              }}
-            >
-              <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <KeyRound size={14} /> Token gerado para teste:
-              </strong>
-              <button
-                type="button"
-                onClick={handleCopiarToken}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  backgroundColor: tokenCopiado ? '#059669' : '#3730a3',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '3px 8px',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                }}
-              >
-                {tokenCopiado ? (
-                  <>
-                    <Check size={12} /> Copiado!
-                  </>
-                ) : (
-                  <>
-                    <Copy size={12} /> Copiar
-                  </>
-                )}
-              </button>
-            </div>
-            <div
-              style={{
-                wordBreak: 'break-all',
-                backgroundColor: '#0f172a',
-                padding: '6px 8px',
-                borderRadius: '4px',
-                fontFamily: 'monospace',
-                fontSize: '11px',
-                color: '#a5b4fc',
-              }}
-            >
-              {tokenDev}
-            </div>
-            <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#94a3b8' }}>
-              O token já foi preenchido automaticamente no campo abaixo para facilitar seu teste.
-            </p>
           </div>
         )}
 
@@ -369,7 +286,7 @@ export function ForgotPasswordWizard() {
           </div>
         )}
 
-        {/* ETAPA 1: SOLICITAR TOKEN */}
+        {/* ETAPA 1: SOLICITAR TOKEN VIA E-MAIL */}
         {step === 1 && (
           <form onSubmit={handleSolicitarReset} noValidate>
             <div style={{ marginBottom: '16px' }}>
@@ -384,7 +301,7 @@ export function ForgotPasswordWizard() {
                 Esqueceu sua senha?
               </h2>
               <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0' }}>
-                Informe seu e-mail cadastrado para enviarmos as credenciais de recuperação de acesso.
+                Informe seu e-mail cadastrado. Enviaremos um token e link de recuperação diretamente para sua caixa de entrada.
               </p>
             </div>
 
@@ -447,12 +364,12 @@ export function ForgotPasswordWizard() {
                 transition: 'background-color 0.2s',
               }}
             >
-              {isSubmitting ? 'Enviando instruções...' : 'Solicitar Token de Recuperação'}
+              {isSubmitting ? 'Enviando e-mail...' : 'Enviar Link e Token por E-mail'}
             </button>
           </form>
         )}
 
-        {/* ETAPA 2: DIGITAR TOKEN E NOVA SENHA */}
+        {/* ETAPA 2: DIGITAR O TOKEN RECEBIDO NO E-MAIL E DEFINIR NOVA SENHA */}
         {step === 2 && (
           <form onSubmit={handleConfirmarReset} noValidate>
             <div style={{ marginBottom: '16px' }}>
@@ -464,14 +381,14 @@ export function ForgotPasswordWizard() {
                   margin: '0 0 6px',
                 }}
               >
-                Criar Nova Senha
+                Confirmar Identidade e Nova Senha
               </h2>
               <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0' }}>
-                Insira o token de validação e escolha sua nova senha de acesso.
+                Abra seu e-mail, localize a mensagem do KeepStock e copie o token de validação recebido.
               </p>
             </div>
 
-            {/* Campo Token */}
+            {/* Campo Token - VAZIO, exige que o usuário consulte seu e-mail */}
             <div style={{ marginBottom: '16px' }}>
               <label
                 htmlFor="token"
@@ -486,7 +403,7 @@ export function ForgotPasswordWizard() {
                 }}
               >
                 <KeyRound size={14} color="#818cf8" />
-                Token de Recuperação
+                Token recebido por e-mail
               </label>
 
               <input
@@ -494,7 +411,7 @@ export function ForgotPasswordWizard() {
                 type="text"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="Insira o token recebido"
+                placeholder="Cole aqui o token de validação recebido no seu e-mail"
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -687,7 +604,7 @@ export function ForgotPasswordWizard() {
                 textDecoration: 'underline',
               }}
             >
-              Voltar / Solicitar outro token
+              Reenviar e-mail / Alterar e-mail informado
             </button>
           </form>
         )}
