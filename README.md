@@ -89,25 +89,21 @@ Acesse no seu navegador a URL indicada no terminal (geralmente `http://localhost
 - Tratamento de erros do servidor (como duplicidade de e-mail).
 - Ao concluir com sucesso, redireciona para o login com banner de confirmação.
 
-### 3. Fluxo de Redefinição de Senha (Wizard em 3 Etapas — `/esqueci-senha`)
-Progresso visual em 3 passos com indicador gráfico de etapas conectadas:
-- **Etapa 1 ("Esqueci minha senha")**:
-  - Campo de e-mail com validação de formato.
-  - Chama `POST /api/v1/auth/forgot-password`.
-  - Exibe mensagem genérica informando que, se o e-mail existir, o código foi despachado (sem revelar existência prévia de contas por segurança).
-  - Avança para a etapa 2.
-- **Etapa 2 ("Verificar código")**:
-  - Interface com 6 caixas de dígitos com foco inteligente e suporte a colagem rápida.
-  - Chama `POST /api/v1/auth/verify-reset-code`.
-  - Trata códigos inválidos ou expirados com mensagens diretas.
-  - Botão de reenvio de código com **contador regressivo de 60 segundos** respeitando limites de taxa de envio.
-  - Botão para alterar o e-mail e retornar à etapa 1.
-- **Etapa 3 ("Definir nova senha")**:
-  - Campos de nova senha e confirmação com medidor visual de força.
-  - Chama `POST /api/v1/auth/reset-password` enviando `email`, `codigo` e `novaSenha`.
-  - Ao sucesso, redireciona para `/login` com confirmação.
-> [!IMPORTANT]
-> O e-mail e o código validado são mantidos **estritamente em memória (React State)** entre as etapas, sem persistência em `localStorage`.
+### 3. Fluxo de Redefinição de Senha (`/recuperar-senha` e `/esqueci-senha`)
+Interface completa para recuperação de senha com progresso visual em 2 etapas, compatível diretamente com a `KStock-API`:
+- **Etapa 1 ("Solicitar Token")**:
+  - Campo de e-mail com validação em tempo real (`isValidEmail`).
+  - Consome `POST /api/v1/auth/esqueci-senha`.
+  - Exibe mensagem de confirmação amigável e proteção contra enumeração de e-mails.
+  - Em ambiente de desenvolvimento/teste, caso o backend retorne o token gerado, a interface apresenta um box visual com o token em destaque e botão de **1 clique para copiar**, além de preencher automaticamente o campo para o próximo passo.
+  - Avança para a Etapa 2.
+- **Etapa 2 ("Criar Nova Senha")**:
+  - Detecção automática de token via URL (ex: `/recuperar-senha?token=XYZ&email=teste@empresa.com`).
+  - Campo para inserção/validação do token de recuperação de 32 bytes gerado pelo servidor.
+  - Campos de nova senha e confirmação com alternância de visibilidade (ícones de olho/ocultar) e validação de tamanho mínimo (6+ caracteres) e igualdade.
+  - Consome `POST /api/v1/auth/resetar-senha` enviando `{ token, novaSenha }`.
+  - Ao concluir com sucesso, redireciona o usuário para o `/login` com banner verde de confirmação (`Senha redefinida com sucesso! Faça login com suas novas credenciais.`).
+  - Permite retornar à etapa 1 para solicitar novo token ou retornar ao login a qualquer momento.
 
 ---
 
