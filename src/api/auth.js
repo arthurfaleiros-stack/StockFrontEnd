@@ -38,38 +38,39 @@ export const authService = {
     return response.data;
   },
 
-  /** Protótipo para solicitar redefinição de senha, lógica exige o código enviado ao email */
-  async forgotPassword(email) {
-    const response = await apiClient.post('/api/v1/auth/forgot-password', {
+  /**
+   * Solicita token de recuperação de senha para o e-mail informado
+   * POST /api/v1/auth/esqueci-senha
+   */
+  async solicitarReset(email) {
+    const response = await apiClient.post('/api/v1/auth/esqueci-senha', {
       email: email.trim(),
     });
     return response.data;
   },
 
   /**
-   protótipo para verficar o código enviado ao email do usuário para redefinição de senha
+   * Confirma a redefinição de senha com o token e a nova senha
+   * POST /api/v1/auth/resetar-senha
    */
-  async verifyResetCode(email, codigo) {
-    const response = await apiClient.post('/api/v1/auth/verify-reset-code', {
-      email: email.trim(),
-      codigo: codigo.trim(),
-    });
-    return response.data;
-  },
-
-  /**
-    protótipo para redefinir a senha do usuário, lógica exige o código e o email do usuário, 
-    e depois altera a senha para a nova senha informada
-   */
-  async resetPassword(email, codigo, novaSenha) {
-    const response = await apiClient.post('/api/v1/auth/reset-password', {
-      email: email.trim(),
-      codigo: codigo.trim(),
+  async confirmarReset(token, novaSenha) {
+    const response = await apiClient.post('/api/v1/auth/resetar-senha', {
+      token: token.trim(),
       novaSenha,
     });
     return response.data;
   },
+
+  /**
+   * Aliases compatíveis com versões anteriores
+   */
+  async forgotPassword(email) {
+    return this.solicitarReset(email);
+  },
+
+  async resetPassword(token, novaSenha) {
+    return this.confirmarReset(token, novaSenha);
+  },
 };
 
 export default authService;
-

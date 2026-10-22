@@ -1,40 +1,112 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import authService from '../../api/auth';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { authService } from '../../api/auth';
 import { getErrorMessage } from '../../utils/errorParser';
 import { isValidEmail } from '../../utils/validators';
+import {
+  Mail,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  Check,
+  Copy,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react';
 
-
-// Tela de "Esqueci minha senha", dividida em 3 passos simples:
-// 1) informar o e-mail  2) digitar o código recebido  3) criar a nova senha
 export function ForgotPasswordWizard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
+  // Estados principais
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
-  const [codigo, setCodigo] = useState('');
+  const [token, setToken] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
-  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
+
+  // Auxiliares de UI
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
+  const [tokenCopiado, setTokenCopiado] = useState(false);
+  const [tokenDev, setTokenDev] = useState('');
 
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Passo 1: envia o e-mail e pede pra API mandar o código
-  async function handleRequestCode(e) {
+  // Se o usuário acessar com token pela URL (ex: ?token=xyz&email=teste@kstock.com)
+  useEffect(() => {
+    const urlToken = searchParams.get('token');
+    const urlEmail = searchParams.get('email');
+
+    if (urlEmail) {
+      setEmail(urlEmail);
+    }
+
+    if (urlToken) {
+      setToken(urlToken);
+      setStep(2);
+      setInfoMessage('Token de recuperação detectado. Agora defina sua nova senha.');
+    }
+  }, [searchParams]);
+
+  // Validação do Passo 1
+  function validateStep1() {
+    const newErrors = {};
+    if (!email.trim()) {
+      newErrors.email = 'Informe o e-mail cadastrado.';
+    } else if (!isValidEmail(email)) {
+      newErrors.email = 'Formato de e-mail inválido.';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
+
+  // Validação do Passo 2
+  function validateStep2() {
+    const newErrors = {};
+    if (!token.trim()) {
+      newErrors.token = 'Informe o token de recuperação.';
+    }
+    if (!novaSenha) {
+      newErrors.novaSenha = 'A nova senha é obrigatória.';
+    } else if (novaSenha.length < 6) {
+      newErrors.novaSenha = 'A senha deve conter no mínimo 6 caracteres.';
+    }
+    if (!confirmarSenha) {
+      newErrors.confirmarSenha = 'Confirme sua nova senha.';
+    } else if (novaSenha !== confirmarSenha) {
+      newErrors.confirmarSenha = 'As senhas não coincidem.';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
+
+  // Enviar pedido de recuperação (Passo 1)
+  async function handleSolicitarReset(e) {
     e.preventDefault();
     setApiError('');
+    setInfoMessage('');
 
-    if (!isValidEmail(email)) {
-      setErrors({ email: 'Informe um e-mail válido.' });
-      return;
-    }
+    if (!validateStep1()) return;
 
     setIsSubmitting(true);
     try {
-      await authService.forgotPassword(email);
-      setInfoMessage('Se esse e-mail estiver cadastrado, um código de 6 dígitos foi enviado.');
+      const response = await authService.solicitarReset(email);
+      setInfoMessage(
+        response.message || 'Se o e-mail estiver cadastrado, você receberá as instruções para redefinição.'
+      );
+
+      // Se o backend retornou o token (modo de demonstração/desenvolvimento)
+      if (response.token) {
+        setTokenDev(response.token);
+        setToken(response.token);
+      }
+
       setStep(2);
     } catch (error) {
       setApiError(getErrorMessage(error));
@@ -43,47 +115,20 @@ export function ForgotPasswordWizard() {
     }
   }
 
-  // Passo 2: confere se o código digitado é válido
-  async function handleVerifyCode(e) {
+  // Confirmar redefinição da nova senha (Passo 2)
+  async function handleConfirmarReset(e) {
     e.preventDefault();
     setApiError('');
 
-    if (codigo.trim().length !== 6) {
-      setErrors({ codigo: 'O código tem 6 dígitos.' });
-      return;
-    }
+    if (!validateStep2()) return;
 
     setIsSubmitting(true);
     try {
-      await authService.verifyResetCode(email, codigo.trim());
-      setInfoMessage('Código validado! Agora defina sua nova senha.');
-      setStep(3);
-    } catch (error) {
-      setApiError(getErrorMessage(error));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  // Passo 3: salva a nova senha
-  async function handleResetPassword(e) {
-    e.preventDefault();
-    setApiError('');
-
-    if (novaSenha.length < 6) {
-      setErrors({ novaSenha: 'A senha precisa ter no mínimo 6 caracteres.' });
-      return;
-    }
-    if (novaSenha !== confirmarNovaSenha) {
-      setErrors({ confirmarNovaSenha: 'As senhas não coincidem.' });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await authService.resetPassword(email, codigo.trim(), novaSenha);
+      await authService.confirmarReset(token, novaSenha);
       navigate('/login', {
-        state: { message: 'Senha redefinida com sucesso! Faça login com a nova senha.' },
+        state: {
+          message: 'Senha redefinida com sucesso! Faça login com suas novas credenciais.',
+        },
       });
     } catch (error) {
       setApiError(getErrorMessage(error));
@@ -91,95 +136,588 @@ export function ForgotPasswordWizard() {
     }
   }
 
+  function handleCopiarToken() {
+    if (!tokenDev) return;
+    navigator.clipboard.writeText(tokenDev);
+    setTokenCopiado(true);
+    setTimeout(() => setTokenCopiado(false), 2500);
+  }
+
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <h1>KeepStock</h1>
-          <p>Recuperação de senha</p>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#0f172a',
+        padding: '24px',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '440px',
+          backgroundColor: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          padding: '32px',
+          boxSizing: 'border-box',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
+        }}
+      >
+        {/* Cabeçalho / Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', margin: '0' }}>
+            <span style={{ color: '#ffffff' }}>Keep</span>
+            <span style={{ color: '#7c80f8' }}>Stock</span>
+          </h1>
+          <p style={{ fontSize: '13px', color: '#cbd5e1', margin: '6px 0 0' }}>
+            Recuperação de Acesso ao Sistema
+          </p>
         </div>
 
-        <p className="step-indicator">Passo {step} de 3</p>
+        {/* Indicador de Etapas */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '20px',
+            padding: '8px 12px',
+            backgroundColor: '#0f172a',
+            borderRadius: '8px',
+            border: '1px solid #334155',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                backgroundColor: step === 1 ? '#4f46e5' : '#10b981',
+                color: '#ffffff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: '700',
+              }}
+            >
+              {step === 1 ? '1' : <Check size={14} />}
+            </span>
+            <span
+              style={{
+                fontSize: '13px',
+                fontWeight: '600',
+                color: step === 1 ? '#ffffff' : '#94a3b8',
+              }}
+            >
+              Solicitar Token
+            </span>
+          </div>
 
-        {infoMessage && <div className="alert alert-info">{infoMessage}</div>}
-        {apiError && <div className="alert alert-error">{apiError}</div>}
+          <div
+            style={{
+              flex: 1,
+              height: '1px',
+              backgroundColor: '#334155',
+              margin: '0 12px',
+            }}
+          />
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                backgroundColor: step === 2 ? '#4f46e5' : '#334155',
+                color: '#ffffff',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: '700',
+              }}
+            >
+              2
+            </span>
+            <span
+              style={{
+                fontSize: '13px',
+                fontWeight: '600',
+                color: step === 2 ? '#ffffff' : '#64748b',
+              }}
+            >
+              Nova Senha
+            </span>
+          </div>
+        </div>
+
+        {/* Mensagem Informativa */}
+        {infoMessage && (
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              marginBottom: '16px',
+              backgroundColor: '#0c4a6e',
+              color: '#bae6fd',
+              border: '1px solid #0284c7',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px',
+            }}
+          >
+            <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <span>{infoMessage}</span>
+          </div>
+        )}
+
+        {/* Banner de Demonstração / Token Gerado */}
+        {tokenDev && step === 2 && (
+          <div
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              marginBottom: '16px',
+              backgroundColor: '#1e1b4b',
+              color: '#c7d2fe',
+              border: '1px solid #4338ca',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '6px',
+              }}
+            >
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <KeyRound size={14} /> Token gerado para teste:
+              </strong>
+              <button
+                type="button"
+                onClick={handleCopiarToken}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: tokenCopiado ? '#059669' : '#3730a3',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '3px 8px',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                }}
+              >
+                {tokenCopiado ? (
+                  <>
+                    <Check size={12} /> Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={12} /> Copiar
+                  </>
+                )}
+              </button>
+            </div>
+            <div
+              style={{
+                wordBreak: 'break-all',
+                backgroundColor: '#0f172a',
+                padding: '6px 8px',
+                borderRadius: '4px',
+                fontFamily: 'monospace',
+                fontSize: '11px',
+                color: '#a5b4fc',
+              }}
+            >
+              {tokenDev}
+            </div>
+            <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#94a3b8' }}>
+              O token já foi preenchido automaticamente no campo abaixo para facilitar seu teste.
+            </p>
+          </div>
+        )}
+
+        {/* Alerta de Erro */}
+        {apiError && (
+          <div
+            style={{
+              padding: '10px 12px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              marginBottom: '16px',
+              backgroundColor: '#450a0a',
+              color: '#fecaca',
+              border: '1px solid #991b1b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <AlertCircle size={18} style={{ flexShrink: 0 }} />
+            <span>{apiError}</span>
+          </div>
+        )}
+
+        {/* ETAPA 1: SOLICITAR TOKEN */}
         {step === 1 && (
-          <form onSubmit={handleRequestCode} noValidate>
-            <h2 className="auth-title">Qual é o seu e-mail?</h2>
-            <div className="form-group">
-              <label htmlFor="email">E-mail cadastrado</label>
+          <form onSubmit={handleSolicitarReset} noValidate>
+            <div style={{ marginBottom: '16px' }}>
+              <h2
+                style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  margin: '0 0 6px',
+                }}
+              >
+                Esqueceu sua senha?
+              </h2>
+              <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0' }}>
+                Informe seu e-mail cadastrado para enviarmos as credenciais de recuperação de acesso.
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label
+                htmlFor="email"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  marginBottom: '6px',
+                }}
+              >
+                <Mail size={14} color="#818cf8" />
+                E-mail
+              </label>
+
               <input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu.email@empresa.com"
+                placeholder="exemplo@kstock.com"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: '14px',
+                  border: errors.email ? '1px solid #dc2626' : '1px solid #475569',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  backgroundColor: '#0f172a',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
               />
-              {errors.email && <p className="form-error">{errors.email}</p>}
+
+              {errors.email && (
+                <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
+                  {errors.email}
+                </p>
+              )}
             </div>
-            <button type="submit" className="btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Enviando...' : 'Enviar código'}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              style={{
+                width: '100%',
+                padding: '11px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#ffffff',
+                backgroundColor: isSubmitting ? '#6366f1' : '#4f46e5',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+            >
+              {isSubmitting ? 'Enviando instruções...' : 'Solicitar Token de Recuperação'}
             </button>
           </form>
         )}
 
+        {/* ETAPA 2: DIGITAR TOKEN E NOVA SENHA */}
         {step === 2 && (
-          <form onSubmit={handleVerifyCode} noValidate>
-            <h2 className="auth-title">Digite o código recebido</h2>
-            <div className="form-group">
-              <label htmlFor="codigo">Código de 6 dígitos</label>
+          <form onSubmit={handleConfirmarReset} noValidate>
+            <div style={{ marginBottom: '16px' }}>
+              <h2
+                style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  margin: '0 0 6px',
+                }}
+              >
+                Criar Nova Senha
+              </h2>
+              <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0' }}>
+                Insira o token de validação e escolha sua nova senha de acesso.
+              </p>
+            </div>
+
+            {/* Campo Token */}
+            <div style={{ marginBottom: '16px' }}>
+              <label
+                htmlFor="token"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  marginBottom: '6px',
+                }}
+              >
+                <KeyRound size={14} color="#818cf8" />
+                Token de Recuperação
+              </label>
+
               <input
-                id="codigo"
+                id="token"
                 type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={codigo}
-                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
-                placeholder="000000"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Insira o token recebido"
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  fontSize: '13px',
+                  fontFamily: 'monospace',
+                  border: errors.token ? '1px solid #dc2626' : '1px solid #475569',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  backgroundColor: '#0f172a',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
               />
-              {errors.codigo && <p className="form-error">{errors.codigo}</p>}
+
+              {errors.token && (
+                <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
+                  {errors.token}
+                </p>
+              )}
             </div>
-            <button type="submit" className="btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Verificando...' : 'Verificar código'}
+
+            {/* Nova Senha */}
+            <div style={{ marginBottom: '16px' }}>
+              <label
+                htmlFor="novaSenha"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  marginBottom: '6px',
+                }}
+              >
+                <Lock size={14} color="#818cf8" />
+                Nova Senha
+              </label>
+
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="novaSenha"
+                  type={mostrarSenha ? 'text' : 'password'}
+                  value={novaSenha}
+                  onChange={(e) => setNovaSenha(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  style={{
+                    width: '100%',
+                    padding: '10px 40px 10px 12px',
+                    fontSize: '14px',
+                    border: errors.novaSenha ? '1px solid #dc2626' : '1px solid #475569',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    backgroundColor: '#0f172a',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenha(!mostrarSenha)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  tabIndex={-1}
+                >
+                  {mostrarSenha ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {errors.novaSenha && (
+                <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
+                  {errors.novaSenha}
+                </p>
+              )}
+            </div>
+
+            {/* Confirmar Nova Senha */}
+            <div style={{ marginBottom: '20px' }}>
+              <label
+                htmlFor="confirmarSenha"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#ffffff',
+                  marginBottom: '6px',
+                }}
+              >
+                <Lock size={14} color="#818cf8" />
+                Confirmar Nova Senha
+              </label>
+
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="confirmarSenha"
+                  type={mostrarConfirmar ? 'text' : 'password'}
+                  value={confirmarSenha}
+                  onChange={(e) => setConfirmarSenha(e.target.value)}
+                  placeholder="Repita a nova senha"
+                  style={{
+                    width: '100%',
+                    padding: '10px 40px 10px 12px',
+                    fontSize: '14px',
+                    border: errors.confirmarSenha ? '1px solid #dc2626' : '1px solid #475569',
+                    borderRadius: '8px',
+                    color: '#ffffff',
+                    backgroundColor: '#0f172a',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setMostrarConfirmar(!mostrarConfirmar)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  tabIndex={-1}
+                >
+                  {mostrarConfirmar ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {errors.confirmarSenha && (
+                <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
+                  {errors.confirmarSenha}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              style={{
+                width: '100%',
+                padding: '11px',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#ffffff',
+                backgroundColor: isSubmitting ? '#6366f1' : '#4f46e5',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s',
+                marginBottom: '12px',
+              }}
+            >
+              {isSubmitting ? 'Redefinindo...' : 'Redefinir Senha'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep(1);
+                setApiError('');
+              }}
+              style={{
+                width: '100%',
+                padding: '8px',
+                fontSize: '12px',
+                color: '#94a3b8',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              Voltar / Solicitar outro token
             </button>
           </form>
         )}
 
-        {step === 3 && (
-          <form onSubmit={handleResetPassword} noValidate>
-            <h2 className="auth-title">Defina sua nova senha</h2>
-            <div className="form-group">
-              <label htmlFor="novaSenha">Nova senha</label>
-              <input
-                id="novaSenha"
-                type="password"
-                value={novaSenha}
-                onChange={(e) => setNovaSenha(e.target.value)}
-                placeholder="Mínimo de 6 caracteres"
-              />
-              {errors.novaSenha && <p className="form-error">{errors.novaSenha}</p>}
-            </div>
-            <div className="form-group">
-              <label htmlFor="confirmarNovaSenha">Confirmar nova senha</label>
-              <input
-                id="confirmarNovaSenha"
-                type="password"
-                value={confirmarNovaSenha}
-                onChange={(e) => setConfirmarNovaSenha(e.target.value)}
-                placeholder="Digite a senha novamente"
-              />
-              {errors.confirmarNovaSenha && <p className="form-error">{errors.confirmarNovaSenha}</p>}
-            </div>
-            <button type="submit" className="btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Salvando...' : 'Salvar nova senha'}
-            </button>
-          </form>
-        )}
-
-        <p className="auth-footer">
-          Lembrou a senha? <Link to="/login">Voltar ao login</Link>
-        </p>
+        {/* Rodapé / Link de Retorno */}
+        <div
+          style={{
+            textAlign: 'center',
+            marginTop: '24px',
+            paddingTop: '16px',
+            borderTop: '1px solid #334155',
+            fontSize: '13px',
+            color: '#cbd5e1',
+          }}
+        >
+          <Link
+            to="/login"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: '#a5b4fc',
+              fontWeight: '600',
+              textDecoration: 'none',
+            }}
+          >
+            <ArrowLeft size={14} />
+            Voltar para o Login
+          </Link>
+        </div>
       </div>
     </div>
   );

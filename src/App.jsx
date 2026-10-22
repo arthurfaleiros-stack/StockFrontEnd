@@ -30,6 +30,7 @@ export function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/cadastro" element={<GuestRoute><RegisterPage /></GuestRoute>} />
           <Route path="/esqueci-senha" element={<GuestRoute><ForgotPasswordWizard /></GuestRoute>} />
+          <Route path="/recuperar-senha" element={<GuestRoute><ForgotPasswordWizard /></GuestRoute>} />
 
           {/* ROTAS PROTEGIDAS (exigem JWT válido) */}
           <Route
