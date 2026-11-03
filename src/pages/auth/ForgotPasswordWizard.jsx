@@ -23,7 +23,7 @@ export function ForgotPasswordWizard() {
   // Estados principais
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
+  const [codigo, setToken] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
 
@@ -36,9 +36,9 @@ export function ForgotPasswordWizard() {
   const [infoMessage, setInfoMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Se o usuário clicar diretamente no link recebido no e-mail (ex: ?token=xyz&email=teste@empresa.com)
+  // Se o usuário clicar diretamente no link recebido no e-mail (ex: ?codigo=xyz&email=teste@empresa.com)
   useEffect(() => {
-    const urlToken = searchParams.get('token');
+    const urlToken = searchParams.get('codigo');
     const urlEmail = searchParams.get('email');
 
     if (urlEmail) {
@@ -67,8 +67,8 @@ export function ForgotPasswordWizard() {
   // Validação do Passo 2
   function validateStep2() {
     const newErrors = {};
-    if (!token.trim()) {
-      newErrors.token = 'Informe o token recebido no seu e-mail.';
+    if (!codigo.trim()) {
+      newErrors.codigo = 'Informe o codigo recebido no seu e-mail.';
     }
     if (!novaSenha) {
       newErrors.novaSenha = 'A nova senha é obrigatória.';
@@ -97,10 +97,10 @@ export function ForgotPasswordWizard() {
       const response = await authService.solicitarReset(email);
       setInfoMessage(
         response.message ||
-          `Enviamos um e-mail com as instruções para ${email}. Verifique sua caixa de entrada e pasta de spam para pegar o token.`
+          `Enviamos um e-mail com as instruções para ${email}. Verifique sua caixa de entrada e pasta de spam para pegar o codigo.`
       );
 
-      // O token NÃO é preenchido aqui: o usuário DEVE consultar seu e-mail real!
+      // O codigo NÃO é preenchido aqui: o usuário DEVE consultar seu e-mail real!
       setToken('');
       setStep(2);
     } catch (error) {
@@ -119,7 +119,7 @@ export function ForgotPasswordWizard() {
 
     setIsSubmitting(true);
     try {
-      await authService.confirmarReset(token, novaSenha);
+      await authService.confirmarReset(codigo, novaSenha);
       navigate('/login', {
         state: {
           message: 'Senha redefinida com sucesso! Faça login com suas novas credenciais.',
@@ -286,7 +286,7 @@ export function ForgotPasswordWizard() {
           </div>
         )}
 
-        {/* ETAPA 1: SOLICITAR TOKEN VIA E-MAIL */}
+        {/* ETAPA 1: SOLICITAR CODIGO POR E-MAIL */}
         {step === 1 && (
           <form onSubmit={handleSolicitarReset} noValidate>
             <div style={{ marginBottom: '16px' }}>
@@ -301,7 +301,7 @@ export function ForgotPasswordWizard() {
                 Esqueceu sua senha?
               </h2>
               <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0' }}>
-                Informe seu e-mail cadastrado. Enviaremos um token e link de recuperação diretamente para sua caixa de entrada.
+                Informe seu e-mail cadastrado. Enviaremos um codigo e link de recuperação diretamente para sua caixa de entrada.
               </p>
             </div>
 
@@ -364,12 +364,12 @@ export function ForgotPasswordWizard() {
                 transition: 'background-color 0.2s',
               }}
             >
-              {isSubmitting ? 'Enviando e-mail...' : 'Enviar Link e Token por E-mail'}
+              {isSubmitting ? 'Enviando e-mail...' : 'Enviar Código por E-mail'}
             </button>
           </form>
         )}
 
-        {/* ETAPA 2: DIGITAR O TOKEN RECEBIDO NO E-MAIL E DEFINIR NOVA SENHA */}
+        {/* ETAPA 2: DIGITAR O CODIGO RECEBIDO NO E-MAIL E DEFINIR NOVA SENHA */}
         {step === 2 && (
           <form onSubmit={handleConfirmarReset} noValidate>
             <div style={{ marginBottom: '16px' }}>
@@ -384,14 +384,14 @@ export function ForgotPasswordWizard() {
                 Confirmar Identidade e Nova Senha
               </h2>
               <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0' }}>
-                Abra seu e-mail, localize a mensagem do KeepStock e copie o token de validação recebido.
+                Abra seu e-mail, localize a mensagem do KeepStock e copie o codigo de validação recebido.
               </p>
             </div>
 
-            {/* Campo Token - VAZIO, exige que o usuário consulte seu e-mail */}
+            {/* Campo Codigo - VAZIO, exige que o usuario consulte seu e-mail */}
             <div style={{ marginBottom: '16px' }}>
               <label
-                htmlFor="token"
+                htmlFor="codigo"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -403,21 +403,21 @@ export function ForgotPasswordWizard() {
                 }}
               >
                 <KeyRound size={14} color="#818cf8" />
-                Token recebido por e-mail
+                Codigo de verificacao recebido por e-mail
               </label>
 
               <input
-                id="token"
+                id="codigo"
                 type="text"
-                value={token}
+                value={codigo}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="Cole aqui o token de validação recebido no seu e-mail"
+                placeholder="Cole aqui o codigo de validação recebido no seu e-mail"
                 style={{
                   width: '100%',
                   padding: '10px 12px',
                   fontSize: '13px',
                   fontFamily: 'monospace',
-                  border: errors.token ? '1px solid #dc2626' : '1px solid #475569',
+                  border: errors.codigo ? '1px solid #dc2626' : '1px solid #475569',
                   borderRadius: '8px',
                   color: '#ffffff',
                   backgroundColor: '#0f172a',
@@ -426,9 +426,9 @@ export function ForgotPasswordWizard() {
                 }}
               />
 
-              {errors.token && (
+              {errors.codigo && (
                 <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
-                  {errors.token}
+                  {errors.codigo}
                 </p>
               )}
             </div>

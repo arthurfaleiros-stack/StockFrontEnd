@@ -43,8 +43,25 @@ export const authService = {
    * POST /api/v1/auth/esqueci-senha
    */
   async solicitarReset(email) {
-    const response = await apiClient.post('/api/v1/auth/esqueci-senha', {
+    const response = await apiClient.post('/api/v1/auth/forgot-password', {
       email: email.trim(),
+    });
+    return response.data;
+  },
+
+  async verificarResetCode(email, codigo) {
+    const response = await apiClient.post('/api/v1/auth/verify-reset-code', {
+      email: email.trim(),
+      codigo: codigo.trim(),
+    });
+    return response.data;
+  },
+
+  async resetPassword(email, codigo, novaSenha) {
+    const response = await apiClient.post('/api/v1/auth/reset-password', {
+      email: email.trim(),
+      codigo: codigo.trim(),
+      novaSenha,
     });
     return response.data;
   },
