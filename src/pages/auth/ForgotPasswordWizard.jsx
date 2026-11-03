@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../api/auth';
 import { getErrorMessage } from '../../utils/errorParser';
 import { isValidEmail } from '../../utils/validators';
@@ -11,48 +11,32 @@ import {
   EyeOff,
   ArrowLeft,
   Check,
-  CheckCircle2,
   AlertCircle,
   Inbox,
+  ShieldCheck,
 } from 'lucide-react';
 
 export function ForgotPasswordWizard() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
-  // Estados principais
+  // Estados do formulário
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
+  const [codigo, setCodigo] = useState(''); // Começa ESTRITAMENTE VAZIO, sem autofill
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
 
-  // Auxiliares de UI
+  // Auxiliares visuais
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarConfirmar, setMostrarConfirmar] = useState(false);
 
+  // Estados de controle
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Se o usuário clicar diretamente no link recebido no e-mail (ex: ?token=xyz&email=teste@empresa.com)
-  useEffect(() => {
-    const urlToken = searchParams.get('token');
-    const urlEmail = searchParams.get('email');
-
-    if (urlEmail) {
-      setEmail(urlEmail);
-    }
-
-    if (urlToken) {
-      setToken(urlToken);
-      setStep(2);
-      setInfoMessage('Link de e-mail validado. Agora defina sua nova senha.');
-    }
-  }, [searchParams]);
-
-  // Validação do Passo 1
+  // Validação da Etapa 1 (E-mail)
   function validateStep1() {
     const newErrors = {};
     if (!email.trim()) {
@@ -64,28 +48,35 @@ export function ForgotPasswordWizard() {
     return Object.keys(newErrors).length === 0;
   }
 
-  // Validação do Passo 2
+  // Validação da Etapa 2 (Código digitado manualmente + Senha)
   function validateStep2() {
     const newErrors = {};
-    if (!token.trim()) {
-      newErrors.token = 'Informe o token recebido no seu e-mail.';
+    const cleanCode = codigo.replace(/\D/g, '');
+
+    if (!cleanCode) {
+      newErrors.codigo = 'Informe o código de verificação recebido no seu e-mail.';
+    } else if (cleanCode.length !== 6) {
+      newErrors.codigo = 'O código deve conter exatamente 6 dígitos numéricos.';
     }
+
     if (!novaSenha) {
       newErrors.novaSenha = 'A nova senha é obrigatória.';
     } else if (novaSenha.length < 6) {
       newErrors.novaSenha = 'A senha deve conter no mínimo 6 caracteres.';
     }
+
     if (!confirmarSenha) {
       newErrors.confirmarSenha = 'Confirme sua nova senha.';
     } else if (novaSenha !== confirmarSenha) {
       newErrors.confirmarSenha = 'As senhas não coincidem.';
     }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
 
-  // Enviar pedido de recuperação (Passo 1)
-  async function handleSolicitarReset(e) {
+  // Envio do código de 6 dígitos para o e-mail
+  async function handleSolicitarCodigo(e) {
     e.preventDefault();
     setApiError('');
     setInfoMessage('');
@@ -94,14 +85,14 @@ export function ForgotPasswordWizard() {
 
     setIsSubmitting(true);
     try {
-      const response = await authService.solicitarReset(email);
+      const response = await authService.solicitarReset(email.trim());
       setInfoMessage(
         response.message ||
-          `Enviamos um e-mail com as instruções para ${email}. Verifique sua caixa de entrada e pasta de spam para pegar o token.`
+          `Enviamos um código de verificação para ${email}. Acesse sua caixa de e-mail para consultá-lo.`
       );
 
-      // O token NÃO é preenchido aqui: o usuário DEVE consultar seu e-mail real!
-      setToken('');
+      // Garante que o código permaneça rigorosamente vazio para o usuário digitar
+      setCodigo('');
       setStep(2);
     } catch (error) {
       setApiError(getErrorMessage(error));
@@ -110,8 +101,8 @@ export function ForgotPasswordWizard() {
     }
   }
 
-  // Confirmar redefinição da nova senha (Passo 2)
-  async function handleConfirmarReset(e) {
+  // Confirmação do código digitado e alteração de senha
+  async function handleConfirmarCodigo(e) {
     e.preventDefault();
     setApiError('');
 
@@ -119,10 +110,15 @@ export function ForgotPasswordWizard() {
 
     setIsSubmitting(true);
     try {
-      await authService.confirmarReset(token, novaSenha);
+      await authService.confirmarReset({
+        email: email.trim(),
+        codigo: codigo.replace(/\D/g, ''),
+        novaSenha,
+      });
+
       navigate('/login', {
         state: {
-          message: 'Senha redefinida com sucesso! Faça login com suas novas credenciais.',
+          message: 'Senha alterada com sucesso! Faça login com sua nova senha.',
         },
       });
     } catch (error) {
@@ -148,41 +144,41 @@ export function ForgotPasswordWizard() {
           maxWidth: '440px',
           backgroundColor: '#1e293b',
           border: '1px solid #334155',
-          borderRadius: '12px',
+          borderRadius: '16px',
           padding: '32px',
           boxSizing: 'border-box',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
         }}
       >
-        {/* Cabeçalho / Logo */}
+        {/* Logo KeepStock */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', margin: '0' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', margin: '0' }}>
             <span style={{ color: '#ffffff' }}>Keep</span>
             <span style={{ color: '#7c80f8' }}>Stock</span>
           </h1>
-          <p style={{ fontSize: '13px', color: '#cbd5e1', margin: '6px 0 0' }}>
-            Recuperação de Acesso ao Sistema
+          <p style={{ fontSize: '13px', color: '#94a3b8', margin: '6px 0 0' }}>
+            Recuperação de Acesso Corporativo
           </p>
         </div>
 
-        {/* Indicador de Etapas */}
+        {/* Indicador Visual das Etapas */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: '20px',
-            padding: '8px 12px',
+            marginBottom: '24px',
+            padding: '10px 14px',
             backgroundColor: '#0f172a',
-            borderRadius: '8px',
+            borderRadius: '10px',
             border: '1px solid #334155',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span
               style={{
-                width: '24px',
-                height: '24px',
+                width: '26px',
+                height: '26px',
                 borderRadius: '50%',
                 backgroundColor: step === 1 ? '#4f46e5' : '#10b981',
                 color: '#ffffff',
@@ -202,7 +198,7 @@ export function ForgotPasswordWizard() {
                 color: step === 1 ? '#ffffff' : '#94a3b8',
               }}
             >
-              E-mail
+              Solicitar Código
             </span>
           </div>
 
@@ -218,8 +214,8 @@ export function ForgotPasswordWizard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span
               style={{
-                width: '24px',
-                height: '24px',
+                width: '26px',
+                height: '26px',
                 borderRadius: '50%',
                 backgroundColor: step === 2 ? '#4f46e5' : '#334155',
                 color: '#ffffff',
@@ -239,16 +235,16 @@ export function ForgotPasswordWizard() {
                 color: step === 2 ? '#ffffff' : '#64748b',
               }}
             >
-              Validação & Senha
+              Validar & Redefinir
             </span>
           </div>
         </div>
 
-        {/* Mensagem Informativa de Envio de E-mail */}
+        {/* Mensagem Informativa de Envio */}
         {infoMessage && (
           <div
             style={{
-              padding: '12px',
+              padding: '12px 14px',
               borderRadius: '8px',
               fontSize: '13px',
               marginBottom: '16px',
@@ -257,15 +253,15 @@ export function ForgotPasswordWizard() {
               border: '1px solid #0284c7',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: '8px',
+              gap: '10px',
             }}
           >
-            <Inbox size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-            <span>{infoMessage}</span>
+            <Inbox size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <span style={{ lineHeight: '1.5' }}>{infoMessage}</span>
           </div>
         )}
 
-        {/* Alerta de Erro */}
+        {/* Mensagem de Erro da API */}
         {apiError && (
           <div
             style={{
@@ -286,22 +282,22 @@ export function ForgotPasswordWizard() {
           </div>
         )}
 
-        {/* ETAPA 1: SOLICITAR TOKEN VIA E-MAIL */}
+        {/* PASSO 1: INFORMAR E-MAIL */}
         {step === 1 && (
-          <form onSubmit={handleSolicitarReset} noValidate>
+          <form onSubmit={handleSolicitarCodigo} noValidate>
             <div style={{ marginBottom: '16px' }}>
               <h2
                 style={{
                   fontSize: '16px',
-                  fontWeight: '600',
+                  fontWeight: '700',
                   color: '#ffffff',
                   margin: '0 0 6px',
                 }}
               >
                 Esqueceu sua senha?
               </h2>
-              <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0' }}>
-                Informe seu e-mail cadastrado. Enviaremos um token e link de recuperação diretamente para sua caixa de entrada.
+              <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0', lineHeight: '1.5' }}>
+                Informe seu e-mail cadastrado. Enviaremos um <strong>código de verificação de 6 dígitos</strong> para que você comprove sua identidade.
               </p>
             </div>
 
@@ -319,7 +315,7 @@ export function ForgotPasswordWizard() {
                 }}
               >
                 <Mail size={14} color="#818cf8" />
-                E-mail
+                E-mail Cadastrado
               </label>
 
               <input
@@ -327,10 +323,10 @@ export function ForgotPasswordWizard() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="exemplo@kstock.com"
+                placeholder="seu.email@empresa.com"
                 style={{
                   width: '100%',
-                  padding: '10px 12px',
+                  padding: '11px 12px',
                   fontSize: '14px',
                   border: errors.email ? '1px solid #dc2626' : '1px solid #475569',
                   borderRadius: '8px',
@@ -342,7 +338,7 @@ export function ForgotPasswordWizard() {
               />
 
               {errors.email && (
-                <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
+                <p style={{ fontSize: '12px', color: '#fca5a5', margin: '4px 0 0' }}>
                   {errors.email}
                 </p>
               )}
@@ -353,7 +349,7 @@ export function ForgotPasswordWizard() {
               disabled={isSubmitting}
               style={{
                 width: '100%',
-                padding: '11px',
+                padding: '12px',
                 fontSize: '14px',
                 fontWeight: '600',
                 color: '#ffffff',
@@ -364,34 +360,38 @@ export function ForgotPasswordWizard() {
                 transition: 'background-color 0.2s',
               }}
             >
-              {isSubmitting ? 'Enviando e-mail...' : 'Enviar Link e Token por E-mail'}
+              {isSubmitting ? 'Enviando código...' : 'Enviar Código de Verificação'}
             </button>
           </form>
         )}
 
-        {/* ETAPA 2: DIGITAR O TOKEN RECEBIDO NO E-MAIL E DEFINIR NOVA SENHA */}
+        {/* PASSO 2: DIGITAR O CÓDIGO RECEBIDO MANUALMENTE E CRIAR NOVA SENHA */}
         {step === 2 && (
-          <form onSubmit={handleConfirmarReset} noValidate>
+          <form onSubmit={handleConfirmarCodigo} noValidate>
             <div style={{ marginBottom: '16px' }}>
               <h2
                 style={{
                   fontSize: '16px',
-                  fontWeight: '600',
+                  fontWeight: '700',
                   color: '#ffffff',
                   margin: '0 0 6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                 }}
               >
-                Confirmar Identidade e Nova Senha
+                <ShieldCheck size={18} color="#38bdf8" />
+                Digite o Código e sua Nova Senha
               </h2>
-              <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0' }}>
-                Abra seu e-mail, localize a mensagem do KeepStock e copie o token de validação recebido.
+              <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0', lineHeight: '1.5' }}>
+                Verifique a mensagem enviada para <strong style={{ color: '#ffffff' }}>{email}</strong>, copie o código de 6 dígitos e digite abaixo:
               </p>
             </div>
 
-            {/* Campo Token - VAZIO, exige que o usuário consulte seu e-mail */}
+            {/* Campo do Código de 6 Dígitos (VAZIO, DIGITADO MANUALMENTE) */}
             <div style={{ marginBottom: '16px' }}>
               <label
-                htmlFor="token"
+                htmlFor="codigo"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -403,32 +403,37 @@ export function ForgotPasswordWizard() {
                 }}
               >
                 <KeyRound size={14} color="#818cf8" />
-                Token recebido por e-mail
+                Código de Verificação (6 dígitos)
               </label>
 
               <input
-                id="token"
+                id="codigo"
                 type="text"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Cole aqui o token de validação recebido no seu e-mail"
+                inputMode="numeric"
+                maxLength={6}
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
+                placeholder="Ex: 489201"
+                autoComplete="off"
                 style={{
                   width: '100%',
-                  padding: '10px 12px',
-                  fontSize: '13px',
-                  fontFamily: 'monospace',
-                  border: errors.token ? '1px solid #dc2626' : '1px solid #475569',
+                  padding: '12px 14px',
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  letterSpacing: '6px',
+                  textAlign: 'center',
+                  border: errors.codigo ? '1px solid #dc2626' : '1px solid #6366f1',
                   borderRadius: '8px',
-                  color: '#ffffff',
+                  color: '#38bdf8',
                   backgroundColor: '#0f172a',
                   boxSizing: 'border-box',
                   outline: 'none',
                 }}
               />
 
-              {errors.token && (
-                <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
-                  {errors.token}
+              {errors.codigo && (
+                <p style={{ fontSize: '12px', color: '#fca5a5', margin: '4px 0 0', textAlign: 'center' }}>
+                  {errors.codigo}
                 </p>
               )}
             </div>
@@ -457,10 +462,10 @@ export function ForgotPasswordWizard() {
                   type={mostrarSenha ? 'text' : 'password'}
                   value={novaSenha}
                   onChange={(e) => setNovaSenha(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo de 6 caracteres"
                   style={{
                     width: '100%',
-                    padding: '10px 40px 10px 12px',
+                    padding: '11px 40px 11px 12px',
                     fontSize: '14px',
                     border: errors.novaSenha ? '1px solid #dc2626' : '1px solid #475569',
                     borderRadius: '8px',
@@ -494,7 +499,7 @@ export function ForgotPasswordWizard() {
               </div>
 
               {errors.novaSenha && (
-                <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
+                <p style={{ fontSize: '12px', color: '#fca5a5', margin: '4px 0 0' }}>
                   {errors.novaSenha}
                 </p>
               )}
@@ -524,10 +529,10 @@ export function ForgotPasswordWizard() {
                   type={mostrarConfirmar ? 'text' : 'password'}
                   value={confirmarSenha}
                   onChange={(e) => setConfirmarSenha(e.target.value)}
-                  placeholder="Repita a nova senha"
+                  placeholder="Digite a nova senha novamente"
                   style={{
                     width: '100%',
-                    padding: '10px 40px 10px 12px',
+                    padding: '11px 40px 11px 12px',
                     fontSize: '14px',
                     border: errors.confirmarSenha ? '1px solid #dc2626' : '1px solid #475569',
                     borderRadius: '8px',
@@ -561,7 +566,7 @@ export function ForgotPasswordWizard() {
               </div>
 
               {errors.confirmarSenha && (
-                <p style={{ fontSize: '12px', color: '#fca5a5', marginTop: '4px', margin: '4px 0 0' }}>
+                <p style={{ fontSize: '12px', color: '#fca5a5', margin: '4px 0 0' }}>
                   {errors.confirmarSenha}
                 </p>
               )}
@@ -572,7 +577,7 @@ export function ForgotPasswordWizard() {
               disabled={isSubmitting}
               style={{
                 width: '100%',
-                padding: '11px',
+                padding: '12px',
                 fontSize: '14px',
                 fontWeight: '600',
                 color: '#ffffff',
@@ -584,13 +589,14 @@ export function ForgotPasswordWizard() {
                 marginBottom: '12px',
               }}
             >
-              {isSubmitting ? 'Redefinindo...' : 'Redefinir Senha'}
+              {isSubmitting ? 'Validando...' : 'Validar Código e Redefinir Senha'}
             </button>
 
             <button
               type="button"
               onClick={() => {
                 setStep(1);
+                setCodigo('');
                 setApiError('');
               }}
               style={{
@@ -604,12 +610,12 @@ export function ForgotPasswordWizard() {
                 textDecoration: 'underline',
               }}
             >
-              Reenviar e-mail / Alterar e-mail informado
+              Não recebeu? Reenviar código ou trocar e-mail
             </button>
           </form>
         )}
 
-        {/* Rodapé / Link de Retorno */}
+        {/* Rodapé / Voltar ao Login */}
         <div
           style={{
             textAlign: 'center',

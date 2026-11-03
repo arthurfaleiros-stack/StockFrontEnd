@@ -39,7 +39,7 @@ export const authService = {
   },
 
   /**
-   * Solicita token de recuperação de senha para o e-mail informado
+   * Solicita envio do código de verificação de 6 dígitos para o e-mail
    * POST /api/v1/auth/esqueci-senha
    */
   async solicitarReset(email) {
@@ -50,26 +50,41 @@ export const authService = {
   },
 
   /**
-   * Confirma a redefinição de senha com o token e a nova senha
+   * Confirma a redefinição com o código de 6 dígitos digitado pelo usuário e a nova senha
    * POST /api/v1/auth/resetar-senha
    */
-  async confirmarReset(token, novaSenha) {
-    const response = await apiClient.post('/api/v1/auth/resetar-senha', {
-      token: token.trim(),
-      novaSenha,
-    });
+  async confirmarReset(arg1, arg2) {
+    let payload = {};
+    if (typeof arg1 === 'object' && arg1 !== null) {
+      const cod = (arg1.codigo || arg1.token || '').toString().trim();
+      payload = {
+        email: arg1.email ? arg1.email.trim() : undefined,
+        codigo: cod,
+        token: cod,
+        novaSenha: arg1.novaSenha,
+      };
+    } else {
+      const cod = (arg1 || '').toString().trim();
+      payload = {
+        codigo: cod,
+        token: cod,
+        novaSenha: arg2,
+      };
+    }
+
+    const response = await apiClient.post('/api/v1/auth/resetar-senha', payload);
     return response.data;
   },
 
   /**
-   * Aliases compatíveis com versões anteriores
+   * Aliases para compatibilidade
    */
   async forgotPassword(email) {
     return this.solicitarReset(email);
   },
 
-  async resetPassword(token, novaSenha) {
-    return this.confirmarReset(token, novaSenha);
+  async resetPassword(codigo, novaSenha) {
+    return this.confirmarReset(codigo, novaSenha);
   },
 };
 
