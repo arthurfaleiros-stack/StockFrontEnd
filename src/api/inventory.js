@@ -30,6 +30,32 @@ export const inventoryService = {
     return res.data;
   },
 
+  // Alertas de Estoque
+  async getAlertasEstoque(params = {}) {
+    const res = await apiClient.get('/api/v1/produtos/alerta-estoque', { params });
+    return res.data;
+  },
+
+  // Risco de Ruptura
+  async getRiscoRuptura(params = {}) {
+    const res = await apiClient.get('/api/v1/produtos/risco-ruptura', { params });
+    return res.data;
+  },
+
+  // Previsão de Ruptura por Produto
+  async getPrevisaoRuptura(produtoId) {
+    const res = await apiClient.get(`/api/v1/produtos/${produtoId}/previsao-ruptura`);
+    return res.data;
+  },
+
+  // Upload de Foto do Produto
+  async uploadFotoProduto(produtoId, formData) {
+    const res = await apiClient.post(`/api/v1/produtos/${produtoId}/foto`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
   // Movimentações
   async getMovimentacoes(params = {}) {
     const res = await apiClient.get('/api/v1/movimentacoes', { params });
@@ -90,8 +116,59 @@ export const inventoryService = {
   },
 
   // Usuários (ADMIN)
-  async getUsuarios() {
-    const res = await apiClient.get('/api/v1/usuarios');
+  async getUsuarios(params = {}) {
+    const res = await apiClient.get('/api/v1/usuarios', { params });
+    return res.data;
+  },
+
+  async createUsuario(data) {
+    const res = await apiClient.post('/api/v1/usuarios', data);
+    return res.data;
+  },
+
+  async getUsuarioById(id) {
+    const res = await apiClient.get(`/api/v1/usuarios/${id}`);
+    return res.data;
+  },
+
+  async updateUsuario(id, data) {
+    const res = await apiClient.put(`/api/v1/usuarios/${id}`, data);
+    return res.data;
+  },
+
+  async updateUsuarioPerfil(id, perfil) {
+    const res = await apiClient.patch(`/api/v1/usuarios/${id}/perfil`, { perfil });
+    return res.data;
+  },
+
+  async deleteUsuario(id) {
+    const res = await apiClient.delete(`/api/v1/usuarios/${id}`);
+    return res.data;
+  },
+
+  // Assinaturas
+  async getMinhaAssinatura() {
+    const res = await apiClient.get('/api/v1/assinaturas/minha');
+    return res.data;
+  },
+
+  async getAssinaturas(params = {}) {
+    const res = await apiClient.get('/api/v1/assinaturas', { params });
+    return res.data;
+  },
+
+  async getAssinaturaById(id) {
+    const res = await apiClient.get(`/api/v1/assinaturas/${id}`);
+    return res.data;
+  },
+
+  async createAssinatura(data) {
+    const res = await apiClient.post('/api/v1/assinaturas', data);
+    return res.data;
+  },
+
+  async updateAssinaturaStatus(id, status) {
+    const res = await apiClient.patch(`/api/v1/assinaturas/${id}/status`, { status });
     return res.data;
   },
 
