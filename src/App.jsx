@@ -46,12 +46,10 @@ export function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/produtos" element={<ProdutosPage />} />
             <Route path="/movimentacoes" element={<MovimentacoesPage />} />
-
-            {/* Acessível a ADMIN e GERENTE */}
             <Route
               path="/categorias"
               element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE']}>
+                <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE', 'OPERADOR']}>
                   <CategoriasPage />
                 </ProtectedRoute>
               }
@@ -59,7 +57,7 @@ export function App() {
             <Route
               path="/fornecedores"
               element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE']}>
+                <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE', 'OPERADOR']}>
                   <FornecedoresPage />
                 </ProtectedRoute>
               }
@@ -67,7 +65,7 @@ export function App() {
             <Route
               path="/historico"
               element={
-                <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE']}>
+                <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE', 'OPERADOR']}>
                   <HistoricoPage />
                 </ProtectedRoute>
               }

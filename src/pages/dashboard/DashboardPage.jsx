@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import Card from '../../components/common/Card';
@@ -14,6 +14,9 @@ import {
   ArrowDownRight,
   Clock,
   Layers,
+  BarChart3,
+  Calendar,
+  Sparkles,
 } from 'lucide-react';
 import inventoryService from '../../api/inventory';
 
@@ -26,8 +29,21 @@ export function DashboardPage() {
     movimentacoesTotal: 0,
   });
 
+  const [products, setProducts] = useState([]);
   const [recentMovements, setRecentMovements] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Estados do Gráfico de Sazonalidade de Vendas
+  const [selectedProductFilter, setSelectedProductFilter] = useState('');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [salesAnalytics, setSalesAnalytics] = useState({
+    dadosMensais: [],
+    mesMaisVendido: null,
+    mesMenosVendido: null,
+    totalAnualSaidas: 0,
+    mediaMensal: 0,
+  });
+  const [loadingChart, setLoadingChart] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -43,6 +59,7 @@ export function DashboardPage() {
         const movs = movRes?.data || (Array.isArray(movRes) ? movRes : []);
 
         if (mounted) {
+          setProducts(prods);
           const totalQtd = prods.reduce((acc, p) => acc + (Number(p.quantidade_atual) || 0), 0);
           const baixo = prods.filter(
             (p) => Number(p.quantidade_atual || 0) <= Number(p.quantidade_minima || 0)
@@ -68,6 +85,69 @@ export function DashboardPage() {
       mounted = false;
     };
   }, []);
+
+  // Busca dados de vendas/saídas sazonais do backend
+  useEffect(() => {
+    let mounted = true;
+    async function fetchSalesChart() {
+      try {
+        setLoadingChart(true);
+        const params = { ano: selectedYear };
+        if (selectedProductFilter) {
+          params.produto_id = selectedProductFilter;
+        }
+
+        const data = await inventoryService.getVendasMensais(params);
+        if (mounted && data) {
+          setSalesAnalytics(data);
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar dados de vendas mensais:', err);
+      } finally {
+        if (mounted) setLoadingChart(false);
+      }
+    }
+    fetchSalesChart();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedProductFilter, selectedYear]);
+
+  // Cálculo dinâmico da distribuição de categorias a partir dos produtos reais
+  const categoryStats = useMemo(() => {
+    if (!products || products.length === 0) return [];
+    const counts = {};
+    products.forEach((p) => {
+      const cat = p.categoria_nome || 'Geral / Sem Categoria';
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+
+    const total = products.length;
+    const colors = [
+      'bg-indigo-500',
+      'bg-blue-500',
+      'bg-violet-500',
+      'bg-emerald-500',
+      'bg-cyan-500',
+      'bg-amber-500',
+    ];
+
+    return Object.entries(counts)
+      .map(([nome, count], idx) => ({
+        nome,
+        count,
+        percent: Math.round((count / total) * 100),
+        color: colors[idx % colors.length],
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [products]);
+
+  // Valor máximo para dimensionar a altura das barras do gráfico
+  const maxMonthlySales = useMemo(() => {
+    if (!salesAnalytics.dadosMensais || salesAnalytics.dadosMensais.length === 0) return 10;
+    const maxVal = Math.max(...salesAnalytics.dadosMensais.map((m) => m.totalSaidas), 0);
+    return maxVal > 0 ? maxVal : 10;
+  }, [salesAnalytics.dadosMensais]);
 
   return (
     <div className="space-y-6">
@@ -115,9 +195,15 @@ export function DashboardPage() {
             <span className="text-2xl sm:text-3xl font-extrabold text-white">
               {metrics.totalProdutos}
             </span>
-            <span className="text-xs text-emerald-400 font-medium flex items-center">
-              <ArrowUpRight className="w-3 h-3" /> +8% este mês
-            </span>
+            {metrics.totalProdutos > 0 ? (
+              <span className="text-xs text-emerald-400 font-medium flex items-center">
+                <ArrowUpRight className="w-3 h-3" /> Catálogo Ativo
+              </span>
+            ) : (
+              <span className="text-xs text-slate-500 font-medium">
+                Sem itens cadastrados
+              </span>
+            )}
           </div>
           <p className="text-[11px] text-slate-400 mt-2">Itens com SKU cadastrado no catálogo</p>
         </div>
@@ -179,6 +265,155 @@ export function DashboardPage() {
           <p className="text-[11px] text-slate-400 mt-2">Entradas, saídas e ajustes no armazém</p>
         </div>
       </div>
+
+      {/* NOVO: Gráfico Funcional de Vendas & Análise Sazonal de Priorização */}
+      <Card
+        title="Histórico de Vendas & Análise Sazonal"
+        subtitle="Identifique os meses de maior e menor demanda para planejar compras e priorizar o estoque"
+        icon={BarChart3}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={selectedProductFilter}
+              onChange={(e) => setSelectedProductFilter(e.target.value)}
+              className="bg-[#10172a] border border-[#1e294b] text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Todos os Produtos (Geral)</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome} ({p.codigo})
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="bg-[#10172a] border border-[#1e294b] text-slate-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value={2026}>2026</option>
+              <option value={2025}>2025</option>
+              <option value={2024}>2024</option>
+            </select>
+          </div>
+        }
+      >
+        <div className="space-y-6">
+          {/* Indicadores Sazonais (Pico vs Mínimo) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-[#121c38] border border-[#1d294d] rounded-xl p-3.5 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">
+                  Mês de Maior Venda / Saída
+                </span>
+                <span className="text-base font-bold text-emerald-400 mt-0.5 block">
+                  {salesAnalytics.mesMaisVendido
+                    ? `${salesAnalytics.mesMaisVendido.mesNome} (${salesAnalytics.mesMaisVendido.totalSaidas} un)`
+                    : 'Sem saídas no ano'}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <ArrowUpRight className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="bg-[#121c38] border border-[#1d294d] rounded-xl p-3.5 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">
+                  Mês de Menor Demanda
+                </span>
+                <span className="text-base font-bold text-amber-400 mt-0.5 block">
+                  {salesAnalytics.mesMenosVendido
+                    ? `${salesAnalytics.mesMenosVendido.mesNome} (${salesAnalytics.mesMenosVendido.totalSaidas} un)`
+                    : 'Sem saídas no ano'}
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <ArrowDownRight className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="bg-[#121c38] border border-[#1d294d] rounded-xl p-3.5 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">
+                  Média Mensal de Saída
+                </span>
+                <span className="text-base font-bold text-indigo-300 mt-0.5 block">
+                  {salesAnalytics.mediaMensal} un/mês
+                </span>
+              </div>
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          {/* Área do Gráfico de Barras Responsivo */}
+          <div className="pt-2">
+            <div className="h-56 flex items-end gap-2 sm:gap-4 px-2 border-b border-[#1b2649] pb-2">
+              {salesAnalytics.dadosMensais.map((item) => {
+                const heightPercent = maxMonthlySales > 0 ? (item.totalSaidas / maxMonthlySales) * 100 : 0;
+                const isPeak = salesAnalytics.mesMaisVendido?.mesNumero === item.mesNumero && item.totalSaidas > 0;
+                const isLow = salesAnalytics.mesMenosVendido?.mesNumero === item.mesNumero && item.totalSaidas > 0;
+
+                return (
+                  <div key={item.mesNumero} className="flex-1 flex flex-col items-center h-full justify-end group">
+                    {/* Tooltip com quantidade ao passar o mouse */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-mono font-bold text-white bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded shadow mb-1">
+                      {item.totalSaidas} un
+                    </div>
+
+                    {/* Barra */}
+                    <div className="w-full bg-[#152142] rounded-t-lg h-full flex items-end overflow-hidden">
+                      <div
+                        className={`w-full transition-all duration-500 rounded-t-lg ${
+                          isPeak
+                            ? 'bg-gradient-to-t from-emerald-600 to-emerald-400'
+                            : isLow
+                            ? 'bg-gradient-to-t from-amber-600 to-amber-400'
+                            : item.totalSaidas > 0
+                            ? 'bg-gradient-to-t from-indigo-600 to-indigo-400'
+                            : 'bg-transparent'
+                        }`}
+                        style={{ height: `${Math.max(heightPercent, item.totalSaidas > 0 ? 8 : 2)}%` }}
+                      />
+                    </div>
+
+                    {/* Rótulo do Mês */}
+                    <span
+                      className={`text-[11px] mt-2 font-medium ${
+                        isPeak
+                          ? 'text-emerald-400 font-bold'
+                          : isLow
+                          ? 'text-amber-400 font-bold'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      {item.mesNome}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Insight de Priorização Sazonal */}
+            {salesAnalytics.mesMaisVendido ? (
+              <div className="mt-4 p-3.5 bg-indigo-950/40 border border-indigo-500/20 rounded-xl flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-slate-300">
+                  <span className="font-semibold text-white">Recomendação Estratégica: </span>
+                  O maior volume de saídas ocorre em <strong className="text-emerald-400">{salesAnalytics.mesMaisVendido.mesNome}</strong>.
+                  Para evitar risco de desabastecimento (ruptura), programe reposição com fornecedores de 30 a 60 dias antes deste mês crítico.
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 text-center mt-3">
+                Nenhuma movimentação de saída registrada para o período selecionado. À medida que vendas ou saídas forem computadas, o gráfico refletirá o padrão de consumo.
+              </p>
+            )}
+          </div>
+        </div>
+      </Card>
 
       {/* Seção Central: Movimentações Recentes & Status do Armazém */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -267,54 +502,41 @@ export function DashboardPage() {
           </Card>
         </div>
 
-        {/* Resumo de Categorias & Saúde do Inventário (1 coluna) */}
+        {/* Resumo de Categorias Dinâmico (1 coluna) */}
         <div className="space-y-6">
           <Card
             title="Distribuição por Categoria"
             subtitle="Composição de mercadorias no catálogo"
             icon={Layers}
           >
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-300 font-medium">Eletrônicos & Sensores</span>
-                  <span className="text-slate-400 font-mono">45% (67 itens)</span>
-                </div>
-                <div className="h-2 bg-[#172344] rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-500 rounded-full" style={{ width: '45%' }} />
-                </div>
+            {categoryStats.length === 0 ? (
+              <div className="py-8 text-center text-slate-400">
+                <Layers className="w-8 h-8 mx-auto text-slate-600 mb-2 opacity-50" />
+                <p className="text-xs">Nenhum produto cadastrado ainda.</p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Cadastre produtos no catálogo para visualizar a distribuição real.
+                </p>
               </div>
-
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-300 font-medium">Cabos & Conectores</span>
-                  <span className="text-slate-400 font-mono">25% (37 itens)</span>
-                </div>
-                <div className="h-2 bg-[#172344] rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '25%' }} />
-                </div>
+            ) : (
+              <div className="space-y-4">
+                {categoryStats.map((cat) => (
+                  <div key={cat.nome}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-300 font-medium">{cat.nome}</span>
+                      <span className="text-slate-400 font-mono">
+                        {cat.percent}% ({cat.count} {cat.count === 1 ? 'item' : 'itens'})
+                      </span>
+                    </div>
+                    <div className="h-2 bg-[#172344] rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${cat.color} rounded-full transition-all duration-300`}
+                        style={{ width: `${cat.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-300 font-medium">Automação & CLP</span>
-                  <span className="text-slate-400 font-mono">20% (30 itens)</span>
-                </div>
-                <div className="h-2 bg-[#172344] rounded-full overflow-hidden">
-                  <div className="h-full bg-violet-500 rounded-full" style={{ width: '20%' }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-slate-300 font-medium">Outros Insumos</span>
-                  <span className="text-slate-400 font-mono">10% (14 itens)</span>
-                </div>
-                <div className="h-2 bg-[#172344] rounded-full overflow-hidden">
-                  <div className="h-full bg-slate-500 rounded-full" style={{ width: '10%' }} />
-                </div>
-              </div>
-            </div>
+            )}
 
             <div className="mt-6 pt-4 border-t border-[#172342] flex items-center justify-between text-xs">
               <span className="text-slate-400">Status Operacional</span>

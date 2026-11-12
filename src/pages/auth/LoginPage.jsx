@@ -9,8 +9,9 @@ function LoginPage() {
   const { login } = useAuth();
 
   const successMessage = location.state?.message;
+  const registeredEmail = location.state?.registeredEmail || '';
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(registeredEmail);
   const [senha, setSenha] = useState('');
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
@@ -152,7 +153,7 @@ function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           {/* E-mail */}
           <div
             style={{
@@ -176,6 +177,7 @@ function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Digite seu e-mail"
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -228,6 +230,7 @@ function LoginPage() {
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               placeholder="Digite sua senha"
+              autoComplete="new-password"
               style={{
                 width: '100%',
                 padding: '10px 12px',

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -273,17 +274,22 @@ export function MovimentacoesPage() {
 
             {produtos.length === 0 ? (
               <div className="space-y-4">
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Não existem produtos cadastrados no banco de dados para movimentar.
-                  Acesse o menu <strong className="text-indigo-400">Produtos</strong> e cadastre os itens primeiro.
-                </p>
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  onClick={() => setShowModal(false)}
-                >
-                  Fechar
-                </Button>
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 leading-relaxed">
+                  ⚠️ <strong>Nenhum produto cadastrado:</strong> Uma movimentação requer um item de estoque para ser vinculada. Cadastre seu primeiro produto para liberar os registros de entrada e saída.
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Link to="/produtos" className="flex-1">
+                    <Button variant="primary" fullWidth icon={Plus}>
+                      Cadastrar Produto
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowModal(false)}
+                  >
+                    Fechar
+                  </Button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleCreate} className="space-y-4">

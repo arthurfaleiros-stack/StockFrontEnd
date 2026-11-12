@@ -67,6 +67,7 @@ function RegisterPage() {
     navigate('/login', {
       state: {
         message: 'Cadastro realizado com sucesso! Faça login para continuar.',
+        registeredEmail: email.trim(),
       },
     });
   }

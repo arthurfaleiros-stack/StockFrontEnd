@@ -55,6 +55,7 @@ export function AuthProvider({ children }) {
   function logout() {
     localStorage.removeItem('keepstock_token');
     setUser(null);
+    window.location.href = '/login';
   }
 
   // Confere se o usuário logado tem um dos perfis permitidos

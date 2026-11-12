@@ -42,19 +42,19 @@ export function Sidebar({ isOpen, onClose }) {
       label: 'Categorias',
       path: '/categorias',
       icon: Tags,
-      roles: ['ADMIN', 'GERENTE'],
+      roles: ['ADMIN', 'GERENTE', 'OPERADOR'],
     },
     {
       label: 'Fornecedores',
       path: '/fornecedores',
       icon: Truck,
-      roles: ['ADMIN', 'GERENTE'],
+      roles: ['ADMIN', 'GERENTE', 'OPERADOR'],
     },
     {
       label: 'Histórico & Logs',
       path: '/historico',
       icon: History,
-      roles: ['ADMIN', 'GERENTE'],
+      roles: ['ADMIN', 'GERENTE', 'OPERADOR'],
     },
     {
       label: 'Usuários',

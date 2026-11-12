@@ -43,10 +43,21 @@ export const authService = {
    * POST /api/v1/auth/esqueci-senha
    */
   async solicitarReset(email) {
-    const response = await apiClient.post('/api/v1/auth/forgot-password', {
-      email: email.trim(),
-    });
-    return response.data;
+    try {
+      const response = await apiClient.post('/api/v1/auth/esqueci-senha', {
+        email: email.trim(),
+      });
+      return response.data;
+    } catch (err) {
+      // Fallback para /forgot-password se a rota em português não responder
+      if (err.response?.status === 404) {
+        const response = await apiClient.post('/api/v1/auth/forgot-password', {
+          email: email.trim(),
+        });
+        return response.data;
+      }
+      throw err;
+    }
   },
 
   async verificarResetCode(email, codigo) {

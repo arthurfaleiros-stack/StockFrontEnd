@@ -136,7 +136,7 @@ export function ProdutosPage() {
     }
   };
 
-  const canManageProducts = hasRole(['ADMIN', 'GERENTE']);
+  const canManageProducts = hasRole(['ADMIN', 'GERENTE', 'OPERADOR']);
   const canDeleteProducts = hasRole(['ADMIN']);
 
   // Filtragem

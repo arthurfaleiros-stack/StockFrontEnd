@@ -62,6 +62,11 @@ export const inventoryService = {
     return res.data;
   },
 
+  async getVendasMensais(params = {}) {
+    const res = await apiClient.get('/api/v1/movimentacoes/vendas-mensais', { params });
+    return res.data;
+  },
+
   async createMovimentacao(data) {
     const res = await apiClient.post('/api/v1/movimentacoes', data);
     return res.data;

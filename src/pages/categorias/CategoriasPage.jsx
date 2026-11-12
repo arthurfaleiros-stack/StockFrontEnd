@@ -83,7 +83,7 @@ export function CategoriasPage() {
     (c.descricao || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const canManage = hasRole(['ADMIN', 'GERENTE']);
+  const canManage = hasRole(['ADMIN', 'GERENTE', 'OPERADOR']);
 
   return (
     <div className="space-y-6">
