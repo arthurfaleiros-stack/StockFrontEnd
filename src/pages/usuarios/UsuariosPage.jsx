@@ -18,8 +18,9 @@ export function UsuariosPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await inventoryService.getUsuarios();
-        if (data && Array.isArray(data) && data.length > 0) {
+        const res = await inventoryService.getUsuarios();
+        const data = res?.data || (Array.isArray(res) ? res : []);
+        if (data && data.length > 0) {
           setUsuarios(data);
         }
       } catch {

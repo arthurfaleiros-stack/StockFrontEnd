@@ -4,7 +4,7 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Alert from '../../components/common/Alert';
 import { RoleBadge, StatusBadge } from '../../components/common/Badge';
-import { Search, CreditCard, UserPlus, Calendar, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Search, CreditCard, UserPlus, Calendar } from 'lucide-react';
 import inventoryService from '../../api/inventory';
 import { getErrorMessage } from '../../utils/errorParser';
 import { useAuth } from '../../context/useAuth';
@@ -153,9 +153,10 @@ export function AssinaturasPage() {
       {feedback && (
         <Alert
           type={feedback.type}
-          message={feedback.message}
           onClose={() => setFeedback(null)}
-        />
+        >
+          {feedback.message}
+        </Alert>
       )}
 
       {/* Minha Assinatura (para não-admins) ou Resumo */}
@@ -283,7 +284,7 @@ export function AssinaturasPage() {
 
             {modalError && (
               <div className="mb-4">
-                <Alert type="danger" message={modalError} />
+                <Alert type="danger">{modalError}</Alert>
               </div>
             )}
 
@@ -339,7 +340,7 @@ export function AssinaturasPage() {
                   type="submit"
                   variant="primary"
                   fullWidth
-                  loading={submitting}
+                  isLoading={submitting}
                 >
                   Criar Assinatura
                 </Button>

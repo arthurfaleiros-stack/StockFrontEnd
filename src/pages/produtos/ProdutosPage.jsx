@@ -183,9 +183,10 @@ export function ProdutosPage() {
       {feedback && (
         <Alert
           type={feedback.type}
-          message={feedback.message}
           onClose={() => setFeedback(null)}
-        />
+        >
+          {feedback.message}
+        </Alert>
       )}
 
       {/* Barra de Busca e Filtros */}
@@ -325,7 +326,7 @@ export function ProdutosPage() {
 
             {modalError && (
               <div className="mb-4">
-                <Alert type="danger" message={modalError} />
+                <Alert type="danger">{modalError}</Alert>
               </div>
             )}
 
@@ -463,7 +464,7 @@ export function ProdutosPage() {
                   type="submit"
                   variant="primary"
                   fullWidth
-                  loading={submitting}
+                  isLoading={submitting}
                   disabled={submitting || categorias.length === 0 || fornecedores.length === 0}
                 >
                   Salvar Produto

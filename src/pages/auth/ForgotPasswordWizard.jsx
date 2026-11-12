@@ -408,7 +408,6 @@ export function ForgotPasswordWizard() {
             <div style={{ marginBottom: '16px' }}>
               <label
                 htmlFor="codigo"
-                htmlFor="codigo"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -424,7 +423,6 @@ export function ForgotPasswordWizard() {
               </label>
 
               <input
-                id="codigo"
                 id="codigo"
                 type="text"
                 inputMode="numeric"

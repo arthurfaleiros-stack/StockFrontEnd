@@ -105,14 +105,10 @@ export const authService = {
   },
 
   /**
-   * Aliases para compatibilidade
+   * Alias para compatibilidade
    */
   async forgotPassword(email) {
     return this.solicitarReset(email);
-  },
-
-  async resetPassword(codigo, novaSenha) {
-    return this.confirmarReset(codigo, novaSenha);
   },
 };
 

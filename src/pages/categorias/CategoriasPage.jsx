@@ -112,9 +112,10 @@ export function CategoriasPage() {
       {feedback && (
         <Alert
           type={feedback.type}
-          message={feedback.message}
           onClose={() => setFeedback(null)}
-        />
+        >
+          {feedback.message}
+        </Alert>
       )}
 
       <div className="bg-[#0d1428] border border-[#1b2649] rounded-2xl p-4">
@@ -173,7 +174,7 @@ export function CategoriasPage() {
 
             {modalError && (
               <div className="mb-4">
-                <Alert type="danger" message={modalError} />
+                <Alert type="danger">{modalError}</Alert>
               </div>
             )}
 
@@ -207,7 +208,7 @@ export function CategoriasPage() {
                   type="submit"
                   variant="primary"
                   fullWidth
-                  loading={submitting}
+                  isLoading={submitting}
                 >
                   Salvar Categoria
                 </Button>

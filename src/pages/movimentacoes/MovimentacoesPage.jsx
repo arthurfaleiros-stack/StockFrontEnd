@@ -149,9 +149,10 @@ export function MovimentacoesPage() {
       {feedback && (
         <Alert
           type={feedback.type}
-          message={feedback.message}
           onClose={() => setFeedback(null)}
-        />
+        >
+          {feedback.message}
+        </Alert>
       )}
 
       {/* Barra de Filtros */}
@@ -268,7 +269,7 @@ export function MovimentacoesPage() {
 
             {modalError && (
               <div className="mb-4">
-                <Alert type="danger" message={modalError} />
+                <Alert type="danger">{modalError}</Alert>
               </div>
             )}
 
@@ -391,7 +392,7 @@ export function MovimentacoesPage() {
                     type="submit"
                     variant="primary"
                     fullWidth
-                    loading={submitting}
+                    isLoading={submitting}
                   >
                     Confirmar Operação
                   </Button>
