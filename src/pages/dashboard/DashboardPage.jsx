@@ -30,10 +30,12 @@ export function DashboardPage() {
   });
 
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [recentMovements, setRecentMovements] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Estados do Gráfico de Sazonalidade de Vendas
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
   const [selectedProductFilter, setSelectedProductFilter] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [salesAnalytics, setSalesAnalytics] = useState({
@@ -50,16 +52,19 @@ export function DashboardPage() {
     async function loadData() {
       try {
         setLoading(true);
-        const [prodRes, movRes] = await Promise.all([
+        const [prodRes, movRes, catRes] = await Promise.all([
           inventoryService.getProdutos({ limit: 100 }),
           inventoryService.getMovimentacoes({ limit: 5 }),
+          inventoryService.getCategorias({ limit: 100 }),
         ]);
 
         const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
         const movs = movRes?.data || (Array.isArray(movRes) ? movRes : []);
+        const cats = catRes?.data || (Array.isArray(catRes) ? catRes : []);
 
         if (mounted) {
           setProducts(prods);
+          setCategories(cats);
           const totalQtd = prods.reduce((acc, p) => acc + (Number(p.quantidade_atual) || 0), 0);
           const baixo = prods.filter(
             (p) => Number(p.quantidade_atual || 0) <= Number(p.quantidade_minima || 0)
@@ -93,6 +98,9 @@ export function DashboardPage() {
       try {
         setLoadingChart(true);
         const params = { ano: selectedYear };
+        if (selectedCategoryFilter) {
+          params.categoria_id = selectedCategoryFilter;
+        }
         if (selectedProductFilter) {
           params.produto_id = selectedProductFilter;
         }
@@ -111,36 +119,168 @@ export function DashboardPage() {
     return () => {
       mounted = false;
     };
-  }, [selectedProductFilter, selectedYear]);
+  }, [selectedCategoryFilter, selectedProductFilter, selectedYear]);
 
-  // Cálculo dinâmico da distribuição de categorias a partir dos produtos reais
-  const categoryStats = useMemo(() => {
-    if (!products || products.length === 0) return [];
-    const counts = {};
-    products.forEach((p) => {
-      const cat = p.categoria_nome || 'Geral / Sem Categoria';
-      counts[cat] = (counts[cat] || 0) + 1;
-    });
+// useMemo memoriza o resultado de um cálculo para evitar
+// executá-lo novamente em toda renderização do componente.
+//
+// O cálculo será refeito somente quando a referência de
+// "products" mudar.
+const categoryStats = useMemo(() => {
 
-    const total = products.length;
-    const colors = [
-      'bg-indigo-500',
-      'bg-blue-500',
-      'bg-violet-500',
-      'bg-emerald-500',
-      'bg-cyan-500',
-      'bg-amber-500',
-    ];
+  // Verifica se existe uma lista de produtos e se ela possui pelo menos um elemento. Caso não existam produtos, retorna um array vazio.
+  if (!products || products.length === 0) return [];
 
-    return Object.entries(counts)
-      .map(([nome, count], idx) => ({
-        nome,
-        count,
-        percent: Math.round((count / total) * 100),
-        color: colors[idx % colors.length],
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [products]);
+  // Cria um objeto vazio que será utilizado para contabilizar quantos produtos existem em cada categoria.
+
+  const counts = {};
+
+  // forEach percorre todos os produtos do array.
+  // A variável "p" representa o produto da iteração atual.
+  products.forEach((p) => {
+
+    // Obtém o nome da categoria do produto.
+    //
+    // O operador || (OU) verifica se categoria_nome possui
+    // um valor válido. Caso não possua, utiliza
+    // "Geral / Sem Categoria" como valor padrão.
+    const cat = p.categoria_nome || 'Geral / Sem Categoria';
+
+    // Atualiza a quantidade de produtos daquela categoria.
+    //
+    // counts[cat] verifica se a categoria já existe no objeto.
+    // Caso exista, utiliza sua quantidade atual.
+    // Caso contrário, começa a contagem em zero.
+    // Em seguida, acrescenta 1 ao total.
+    //
+    // Exemplo:
+    // counts["Periféricos"] = (2 || 0) + 1;
+    // Resultado: 3.
+    counts[cat] = (counts[cat] || 0) + 1;
+  });
+
+  // Obtém a quantidade total de produtos cadastrados.
+  // A propriedade length retorna o número de elementos do array.
+  const total = products.length;
+
+  // Array de classes do Tailwind CSS utilizadas para definir
+  // as cores das categorias no gráfico.
+  //
+  // Cada categoria receberá uma cor de acordo com sua posição.
+  const colors = [
+    'bg-indigo-500',
+    'bg-blue-500',
+    'bg-violet-500',
+    'bg-emerald-500',
+    'bg-cyan-500',
+    'bg-amber-500',
+  ];
+
+  // Object.entries transforma o objeto "counts" em um array
+  // de pares contendo a chave e o valor.
+  //
+  // Exemplo:
+  // { "Periféricos": 3, "Monitores": 2 }
+  //
+  // Torna-se:
+  // [["Periféricos", 3], ["Monitores", 2]]
+  return Object.entries(counts)
+
+    // map percorre o array e transforma cada par em um novo objeto.
+    //
+    // nome: nome da categoria.
+    // count: quantidade de produtos naquela categoria.
+    // idx: posição da categoria no array.
+    .map(([nome, count], idx) => ({
+
+      // Armazena o nome da categoria.
+      nome,
+
+      // Armazena a quantidade de produtos da categoria.
+      count,
+
+      // Calcula a porcentagem que aquela categoria representa
+      // em relação ao total de produtos.
+      //
+      // count / total: calcula a proporção.
+      // * 100: transforma a proporção em porcentagem.
+      // Math.round: arredonda o resultado para um número inteiro.
+      percent: Math.round((count / total) * 100),
+
+      // Define a cor da categoria.
+      //
+      // O operador % (módulo) retorna o resto da divisão.
+      // Isso permite reutilizar as cores quando existem
+      // mais categorias do que cores disponíveis.
+      //
+      // Exemplo:
+      // idx = 6 e colors.length = 6.
+      // 6 % 6 = 0, então utiliza a primeira cor novamente.
+      color: colors[idx % colors.length],
+    }))
+
+    // sort organiza as categorias pela quantidade de produtos.
+    //
+    // b.count - a.count ordena do maior para o menor.
+    // Assim, as categorias com mais produtos aparecem primeiro.
+    .sort((a, b) => b.count - a.count);
+
+// Array de dependências do useMemo.
+// O cálculo será refeito quando a referência de products mudar.
+}, [products]);
+
+
+// ============================================================
+// MAIOR QUANTIDADE DE SAÍDAS MENSAIS
+// ============================================================
+
+// useMemo memoriza o maior valor de saídas mensais encontrado.
+// Esse valor será utilizado como referência para dimensionar
+// proporcionalmente as barras do gráfico.
+const maxMonthlySales = useMemo(() => {
+
+  // Verifica se existem dados mensais disponíveis.
+  //
+  // Caso não existam dados, retorna 10 como valor padrão,
+  // evitando que o dimensionamento do gráfico utilize zero.
+  if (!salesAnalytics.dadosMensais ||
+      salesAnalytics.dadosMensais.length === 0) return 10;
+
+  // map percorre os dados mensais e extrai somente
+  // o valor de totalSaidas de cada mês.
+  //
+  // Exemplo:
+  // [
+  //   { mes: "Janeiro", totalSaidas: 20 },
+  //   { mes: "Fevereiro", totalSaidas: 50 }
+  // ]
+  //
+  // Resultado do map:
+  // [20, 50]
+  //
+  // O operador spread (...) espalha os valores do array
+  // como argumentos individuais para o Math.max.
+  //
+  // Math.max retorna o maior número encontrado.
+  // O zero adicional garante que o resultado não seja negativo.
+  const maxVal = Math.max(
+    ...salesAnalytics.dadosMensais.map((m) => m.totalSaidas),
+    0
+  );
+
+  // Operador ternário:
+  //
+  // Se maxVal for maior que zero, retorna o próprio valor.
+  // Caso contrário, retorna 10 como valor padrão.
+  //
+  // Isso garante que o gráfico tenha uma referência positiva
+  // para realizar os cálculos de dimensionamento.
+  return maxVal > 0 ? maxVal : 10;
+
+// O cálculo será refeito quando a referência dos dados mensais
+// mudar.
+}, [salesAnalytics.dadosMensais]);
+
 
   // Valor máximo para dimensionar a altura das barras do gráfico
   const maxMonthlySales = useMemo(() => {
@@ -274,16 +414,34 @@ export function DashboardPage() {
         action={
           <div className="flex flex-wrap items-center gap-2">
             <select
+              value={selectedCategoryFilter}
+              onChange={(e) => {
+                setSelectedCategoryFilter(e.target.value);
+                setSelectedProductFilter('');
+              }}
+              className="bg-[#10172a] border border-[#1e294b] text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Todas as Categorias</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+
+            <select
               value={selectedProductFilter}
               onChange={(e) => setSelectedProductFilter(e.target.value)}
               className="bg-[#10172a] border border-[#1e294b] text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">Todos os Produtos (Geral)</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome} ({p.codigo})
-                </option>
-              ))}
+              {products
+                .filter((p) => !selectedCategoryFilter || Number(p.categoria_id) === Number(selectedCategoryFilter))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome} ({p.codigo})
+                  </option>
+                ))}
             </select>
 
             <select
@@ -375,7 +533,7 @@ export function DashboardPage() {
                             ? 'bg-gradient-to-t from-indigo-600 to-indigo-400'
                             : 'bg-transparent'
                         }`}
-                        style={{ height: `${Math.max(heightPercent, item.totalSaidas > 0 ? 8 : 2)}%` }}
+                        style={{ height: `${Math.max(heightPercent, item.totalSaidas > 0 ? 4 : 0)}%` }}
                       />
                     </div>
 
