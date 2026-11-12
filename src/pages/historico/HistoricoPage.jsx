@@ -32,9 +32,7 @@ const HistoricoPage = () => {
         // O await aguarda a resposta do servidor antes de continuar.
         const res = await inventoryService.getHistorico({ limit: 100 });
 
-        // Verifica o formato da resposta recebida.
-        // Se existir a propriedade data, utiliza seu conteúdo.
-        // Caso a resposta já seja um array, utiliza a própria resposta.
+        // Verifica o formato da resposta recebida. Se existir a propriedade data, utiliza seu conteúdo. Caso a resposta já seja um array, utiliza a própria resposta.
         // Se nenhum dos formatos for encontrado, utiliza um array vazio.
         const data = res?.data || (Array.isArray(res) ? res : []);
 
@@ -80,19 +78,17 @@ const HistoricoPage = () => {
     }
   };
 
-  // Cria uma nova lista contendo somente os registros que correspondem ao texto pesquisado.
-  // O método filter percorre todos os registros e mantém aqueles que atendem às condições.
+ //filtragem de produtos que atendem as condições de pesquisa digitadas pelo usuário.
   const filtered = logs.filter((log) => {
-    // Converte o texto pesquisado para letras minúsculas.
-    // Isso permite realizar pesquisas sem diferenciar letras maiúsculas e minúsculas.
+    
     const term = searchTerm.toLowerCase();
 
     // Verifica se o texto pesquisado aparece em algum dos campos do registro.
     // O operador || significa OU: basta uma das condições ser verdadeira para manter o registro.
-    // O uso de || '' evita erros caso alguma propriedade esteja vazia ou não exista.
+    
     return (
-      (log.usuario_nome || '').toLowerCase().includes(term) ||
-      (log.tipo_operacao || '').toLowerCase().includes(term) ||
+      (log.usuario_nome || '').toLowerCase().includes(term) || // O uso de || '' evita erros caso alguma propriedade esteja vazia ou não exista.
+      (log.tipo_operacao || '').toLowerCase().includes(term) || 
       (log.descricao || '').toLowerCase().includes(term) ||
       (log.produto_nome || '').toLowerCase().includes(term)
     );
