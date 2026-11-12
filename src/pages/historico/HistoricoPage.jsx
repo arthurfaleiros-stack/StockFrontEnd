@@ -4,32 +4,69 @@ import Input from '../../components/common/Input';
 import { Search } from 'lucide-react';
 import inventoryService from '../../api/inventory';
 
-export function HistoricoPage() {
+const HistoricoPage = () => {
+  // Armazena o texto digitado pelo usuário no campo de pesquisa.
+  // O setSearchTerm é utilizado para atualizar o valor da pesquisa sempre que o usuário digitar.
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Armazena todos os registros de movimentações recebidos do backend.
+  // Inicialmente, começa como um array vazio porque os dados ainda não foram carregados.
   const [logs, setLogs] = useState([]);
+
+  // Controla o estado de carregamento da página.
+  // Enquanto estiver true, o sistema informa que está buscando os registros na API.
   const [loading, setLoading] = useState(true);
 
+  // useEffect executa uma função quando o componente é carregado.
+  // Como o array de dependências está vazio, a busca acontece apenas na montagem da página.
   useEffect(() => {
-    async function load() {
+    // Função assíncrona responsável por buscar o histórico de movimentações no backend.
+    // O async permite utilizar await para aguardar a resposta da requisição.
+    const load = async () => {
+      // Ativa o indicador de carregamento antes de iniciar a requisição.
+      setLoading(true);
+
       try {
-        setLoading(true);
+        // Chama o serviço responsável por consultar o histórico na API.
+        // O parâmetro limit: 100 solicita que sejam retornados até 100 registros.
+        // O await aguarda a resposta do servidor antes de continuar.
         const res = await inventoryService.getHistorico({ limit: 100 });
+
+        // Verifica o formato da resposta recebida.
+        // Se existir a propriedade data, utiliza seu conteúdo.
+        // Caso a resposta já seja um array, utiliza a própria resposta.
+        // Se nenhum dos formatos for encontrado, utiliza um array vazio.
         const data = res?.data || (Array.isArray(res) ? res : []);
+
+        // Atualiza o estado logs com os registros recebidos da API.
+        // Isso faz com que o React atualize a interface com os novos dados.
         setLogs(data);
-      } catch {
-        // mantém lista vazia se erro
+      } catch (error) {
+        // Caso a requisição apresente algum erro, mantém o histórico vazio.
+        // Isso evita que dados incorretos sejam apresentados na página.
+        setLogs([]);
       } finally {
+        // Finaliza o carregamento independentemente de a requisição ter funcionado ou apresentado erro.
         setLoading(false);
       }
-    }
+    };
+
+    // Executa a função responsável por buscar os registros do histórico.
     load();
   }, []);
 
-  const formatDate = (isoString) => {
-    if (!isoString) return '—';
+  // Função responsável por transformar uma data em um formato mais fácil de visualizar.
+  // Recebe uma data como parâmetro e retorna a data formatada no padrão brasileiro.
+  const formatDate = (date) => {
+    // Verifica se existe uma data antes de tentar realizar a formatação.
+    // Caso esteja vazia, retorna um traço na interface.
+    if (!date) return '—';
+
     try {
-      const d = new Date(isoString);
-      return d.toLocaleDateString('pt-BR', {
+      // new Date converte o valor recebido em um objeto de data do JavaScript.
+      // toLocaleDateString formata a data utilizando o padrão brasileiro (pt-BR).
+      // As opções definem que serão exibidos dia, mês, ano, hora, minuto e segundo.
+      return new Date(date).toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -38,17 +75,27 @@ export function HistoricoPage() {
         second: '2-digit',
       });
     } catch {
-      return isoString;
+      // Se ocorrer algum erro durante a conversão, retorna o valor original recebido.
+      return date;
     }
   };
 
+  // Cria uma nova lista contendo somente os registros que correspondem ao texto pesquisado.
+  // O método filter percorre todos os registros e mantém aqueles que atendem às condições.
   const filtered = logs.filter((log) => {
+    // Converte o texto pesquisado para letras minúsculas.
+    // Isso permite realizar pesquisas sem diferenciar letras maiúsculas e minúsculas.
     const term = searchTerm.toLowerCase();
-    const user = (log.usuario_nome || '').toLowerCase();
-    const acao = (log.tipo_operacao || '').toLowerCase();
-    const detalhe = (log.descricao || '').toLowerCase();
-    const produto = (log.produto_nome || '').toLowerCase();
-    return user.includes(term) || acao.includes(term) || detalhe.includes(term) || produto.includes(term);
+
+    // Verifica se o texto pesquisado aparece em algum dos campos do registro.
+    // O operador || significa OU: basta uma das condições ser verdadeira para manter o registro.
+    // O uso de || '' evita erros caso alguma propriedade esteja vazia ou não exista.
+    return (
+      (log.usuario_nome || '').toLowerCase().includes(term) ||
+      (log.tipo_operacao || '').toLowerCase().includes(term) ||
+      (log.descricao || '').toLowerCase().includes(term) ||
+      (log.produto_nome || '').toLowerCase().includes(term)
+    );
   });
 
   return (
@@ -136,6 +183,6 @@ export function HistoricoPage() {
       </Card>
     </div>
   );
-}
+};
 
 export default HistoricoPage;

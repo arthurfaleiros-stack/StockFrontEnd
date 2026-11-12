@@ -121,173 +121,75 @@ export function DashboardPage() {
     };
   }, [selectedCategoryFilter, selectedProductFilter, selectedYear]);
 
-// useMemo memoriza o resultado de um cálculo para evitar
-// executá-lo novamente em toda renderização do componente.
-//
-// O cálculo será refeito somente quando a referência de
-// "products" mudar.
-const categoryStats = useMemo(() => {
 
-  // Verifica se existe uma lista de produtos e se ela possui pelo menos um elemento. Caso não existam produtos, retorna um array vazio.
-  if (!products || products.length === 0) return [];
+  // Calcula quantos produtos existem em cada categoria
+  const categoryStats = useMemo(() => { //useMemo constante para armazenar o resultado de um cálculo pesado/ evitando o sistema refazer todas as vezes quando atualizar
 
-  // Cria um objeto vazio que será utilizado para contabilizar quantos produtos existem em cada categoria.
+    // Se não houver produtos, retorna uma lista vazia
+    if (!products || products.length === 0) return [];
 
-  const counts = {};
+    // Objeto que armazenará a quantidade de produtos por categoria
+    const counts = {};
 
-  // forEach percorre todos os produtos do array.
-  // A variável "p" representa o produto da iteração atual.
-  products.forEach((p) => {
+    // Percorre todos os produtos para contar suas categorias
+    products.forEach((p) => {
 
-    // Obtém o nome da categoria do produto.
-    //
-    // O operador || (OU) verifica se categoria_nome possui
-    // um valor válido. Caso não possua, utiliza
-    // "Geral / Sem Categoria" como valor padrão.
-    const cat = p.categoria_nome || 'Geral / Sem Categoria';
+      // Se o produto não tiver categoria, utiliza "Geral / Sem Categoria"
+      const cat = p.categoria_nome || 'Geral / Sem Categoria';
 
-    // Atualiza a quantidade de produtos daquela categoria.
-    //
-    // counts[cat] verifica se a categoria já existe no objeto.
-    // Caso exista, utiliza sua quantidade atual.
-    // Caso contrário, começa a contagem em zero.
-    // Em seguida, acrescenta 1 ao total.
-    //
-    // Exemplo:
-    // counts["Periféricos"] = (2 || 0) + 1;
-    // Resultado: 3.
-    counts[cat] = (counts[cat] || 0) + 1;
-  });
+      // Adiciona 1 à quantidade de produtos daquela categoria
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
 
-  // Obtém a quantidade total de produtos cadastrados.
-  // A propriedade length retorna o número de elementos do array.
-  const total = products.length;
+    // Obtém a quantidade total de produtos
+    const total = products.length;
 
-  // Array de classes do Tailwind CSS utilizadas para definir
-  // as cores das categorias no gráfico.
-  //
-  // Cada categoria receberá uma cor de acordo com sua posição.
-  const colors = [
-    'bg-indigo-500',
-    'bg-blue-500',
-    'bg-violet-500',
-    'bg-emerald-500',
-    'bg-cyan-500',
-    'bg-amber-500',
-  ];
+    // Cores utilizadas para diferenciar as categorias no gráfico
+    const colors = [
+      'bg-indigo-500',
+      'bg-blue-500',
+      'bg-violet-500',
+      'bg-emerald-500',
+      'bg-cyan-500',
+      'bg-amber-500',
+    ];
 
-  // Object.entries transforma o objeto "counts" em um array
-  // de pares contendo a chave e o valor.
-  //
-  // Exemplo:
-  // { "Periféricos": 3, "Monitores": 2 }
-  //
-  // Torna-se:
-  // [["Periféricos", 3], ["Monitores", 2]]
-  return Object.entries(counts)
+    // Transforma os dados em uma lista organizada para o gráfico
+    return Object.entries(counts)
+      .map(([nome, count], idx) => ({
+        nome, // Nome da categoria
+        count, // Quantidade de produtos na categoria
 
-    // map percorre o array e transforma cada par em um novo objeto.
-    //
-    // nome: nome da categoria.
-    // count: quantidade de produtos naquela categoria.
-    // idx: posição da categoria no array.
-    .map(([nome, count], idx) => ({
+        // Calcula a porcentagem de produtos daquela categoria
+        percent: Math.round((count / total) * 100),
 
-      // Armazena o nome da categoria.
-      nome,
+        // Define uma cor para cada categoria, repetindo se necessário
+        color: colors[idx % colors.length],
+      }))
 
-      // Armazena a quantidade de produtos da categoria.
-      count,
+      // Organiza as categorias da maior quantidade para a menor
+      .sort((a, b) => b.count - a.count);
 
-      // Calcula a porcentagem que aquela categoria representa
-      // em relação ao total de produtos.
-      //
-      // count / total: calcula a proporção.
-      // * 100: transforma a proporção em porcentagem.
-      // Math.round: arredonda o resultado para um número inteiro.
-      percent: Math.round((count / total) * 100),
-
-      // Define a cor da categoria.
-      //
-      // O operador % (módulo) retorna o resto da divisão.
-      // Isso permite reutilizar as cores quando existem
-      // mais categorias do que cores disponíveis.
-      //
-      // Exemplo:
-      // idx = 6 e colors.length = 6.
-      // 6 % 6 = 0, então utiliza a primeira cor novamente.
-      color: colors[idx % colors.length],
-    }))
-
-    // sort organiza as categorias pela quantidade de produtos.
-    //
-    // b.count - a.count ordena do maior para o menor.
-    // Assim, as categorias com mais produtos aparecem primeiro.
-    .sort((a, b) => b.count - a.count);
-
-// Array de dependências do useMemo.
-// O cálculo será refeito quando a referência de products mudar.
-}, [products]);
+  }, [products]); // Recalcula quando a lista de produtos mudar
 
 
-// ============================================================
-// MAIOR QUANTIDADE DE SAÍDAS MENSAIS
-// ============================================================
-
-// useMemo memoriza o maior valor de saídas mensais encontrado.
-// Esse valor será utilizado como referência para dimensionar
-// proporcionalmente as barras do gráfico.
-const maxMonthlySales = useMemo(() => {
-
-  // Verifica se existem dados mensais disponíveis.
-  //
-  // Caso não existam dados, retorna 10 como valor padrão,
-  // evitando que o dimensionamento do gráfico utilize zero.
-  if (!salesAnalytics.dadosMensais ||
-      salesAnalytics.dadosMensais.length === 0) return 10;
-
-  // map percorre os dados mensais e extrai somente
-  // o valor de totalSaidas de cada mês.
-  //
-  // Exemplo:
-  // [
-  //   { mes: "Janeiro", totalSaidas: 20 },
-  //   { mes: "Fevereiro", totalSaidas: 50 }
-  // ]
-  //
-  // Resultado do map:
-  // [20, 50]
-  //
-  // O operador spread (...) espalha os valores do array
-  // como argumentos individuais para o Math.max.
-  //
-  // Math.max retorna o maior número encontrado.
-  // O zero adicional garante que o resultado não seja negativo.
-  const maxVal = Math.max(
-    ...salesAnalytics.dadosMensais.map((m) => m.totalSaidas),
-    0
-  );
-
-  // Operador ternário:
-  //
-  // Se maxVal for maior que zero, retorna o próprio valor.
-  // Caso contrário, retorna 10 como valor padrão.
-  //
-  // Isso garante que o gráfico tenha uma referência positiva
-  // para realizar os cálculos de dimensionamento.
-  return maxVal > 0 ? maxVal : 10;
-
-// O cálculo será refeito quando a referência dos dados mensais
-// mudar.
-}, [salesAnalytics.dadosMensais]);
-
-
-  // Valor máximo para dimensionar a altura das barras do gráfico
+  // Encontra a maior quantidade de saídas entre os meses
   const maxMonthlySales = useMemo(() => {
+
+    // Se não houver dados mensais, utiliza 10 como valor padrão
     if (!salesAnalytics.dadosMensais || salesAnalytics.dadosMensais.length === 0) return 10;
-    const maxVal = Math.max(...salesAnalytics.dadosMensais.map((m) => m.totalSaidas), 0);
+
+    // Obtém o maior número de saídas registrado entre os meses
+    const maxVal = Math.max(
+      ...salesAnalytics.dadosMensais.map((m) => m.totalSaidas),
+      0
+    );
+
+    // Se o maior valor for zero ou menor, utiliza 10 como padrão
     return maxVal > 0 ? maxVal : 10;
-  }, [salesAnalytics.dadosMensais]);
+
+  }, [salesAnalytics.dadosMensais]); // Recalcula quando os dados mensais mudarem
+
 
   return (
     <div className="space-y-6">
@@ -524,28 +426,26 @@ const maxMonthlySales = useMemo(() => {
                     {/* Barra */}
                     <div className="w-full bg-[#152142] rounded-t-lg h-full flex items-end overflow-hidden">
                       <div
-                        className={`w-full transition-all duration-500 rounded-t-lg ${
-                          isPeak
+                        className={`w-full transition-all duration-500 rounded-t-lg ${isPeak
                             ? 'bg-gradient-to-t from-emerald-600 to-emerald-400'
                             : isLow
-                            ? 'bg-gradient-to-t from-amber-600 to-amber-400'
-                            : item.totalSaidas > 0
-                            ? 'bg-gradient-to-t from-indigo-600 to-indigo-400'
-                            : 'bg-transparent'
-                        }`}
+                              ? 'bg-gradient-to-t from-amber-600 to-amber-400'
+                              : item.totalSaidas > 0
+                                ? 'bg-gradient-to-t from-indigo-600 to-indigo-400'
+                                : 'bg-transparent'
+                          }`}
                         style={{ height: `${Math.max(heightPercent, item.totalSaidas > 0 ? 4 : 0)}%` }}
                       />
                     </div>
 
                     {/* Rótulo do Mês */}
                     <span
-                      className={`text-[11px] mt-2 font-medium ${
-                        isPeak
+                      className={`text-[11px] mt-2 font-medium ${isPeak
                           ? 'text-emerald-400 font-bold'
                           : isLow
-                          ? 'text-amber-400 font-bold'
-                          : 'text-slate-400'
-                      }`}
+                            ? 'text-amber-400 font-bold'
+                            : 'text-slate-400'
+                        }`}
                     >
                       {item.mesNome}
                     </span>
@@ -614,13 +514,12 @@ const maxMonthlySales = useMemo(() => {
                       <tr key={mov.id} className="hover:bg-[#121c38]/50 transition-colors">
                         <td className="py-3.5">
                           <span
-                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
-                              mov.tipo === 'ENTRADA'
+                            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${mov.tipo === 'ENTRADA'
                                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                                 : mov.tipo === 'SAIDA'
-                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                                : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                            }`}
+                                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                  : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                              }`}
                           >
                             {mov.tipo === 'ENTRADA' ? (
                               <ArrowDownRight className="w-3 h-3" />
@@ -644,11 +543,11 @@ const maxMonthlySales = useMemo(() => {
                         <td className="py-3.5 text-right text-xs text-slate-400 font-mono">
                           {mov.data_hora
                             ? new Date(mov.data_hora).toLocaleDateString('pt-BR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
                             : mov.data}
                         </td>
                       </tr>
