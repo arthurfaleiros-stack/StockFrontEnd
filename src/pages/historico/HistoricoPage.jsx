@@ -288,5 +288,4 @@ const HistoricoPage = () => {
   );
 };
 
-// Exporta o componente HistoricoPage para que ele possa ser importado e utilizado nas rotas do React.
 export default HistoricoPage;
