@@ -47,7 +47,7 @@ const HistoricoPage = () => {
         // A atualização desse estado faz o React renderizar novamente a página com os dados.
         setLogs(data);
 
-      } catch (error) {
+      } catch {
 
         // Executa caso aconteça algum erro durante a comunicação com a API.
         // Nesse caso, mantém a lista vazia para não apresentar informações incorretas.

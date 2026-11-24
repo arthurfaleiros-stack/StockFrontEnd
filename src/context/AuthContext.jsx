@@ -5,7 +5,7 @@ import { AuthContext } from './authContextDef';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => Boolean(localStorage.getItem('keepstock_token')));
 
   // Quando o app abre, se já tiver um token salvo, tenta buscar
   // os dados do usuário pra manter ele logado.
@@ -13,7 +13,6 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('keepstock_token');
 
     if (!token) {
-      setIsLoading(false);
       return;
     }
 

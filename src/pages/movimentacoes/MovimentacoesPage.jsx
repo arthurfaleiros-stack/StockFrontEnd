@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -27,17 +27,22 @@ export function MovimentacoesPage() {
   const [novaQtd, setNovaQtd] = useState(1);
   const [novoMotivo, setNovoMotivo] = useState('');
 
-  const loadData = async () => {
+  const fetchMovimentacoesData = useCallback(async () => {
+    const [movRes, prodRes] = await Promise.all([
+      inventoryService.getMovimentacoes({ limit: 100 }),
+      inventoryService.getProdutos({ limit: 200 }),
+    ]);
+
+    return {
+      movs: movRes?.data || (Array.isArray(movRes) ? movRes : []),
+      prods: prodRes?.data || (Array.isArray(prodRes) ? prodRes : []),
+    };
+  }, []);
+
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [movRes, prodRes] = await Promise.all([
-        inventoryService.getMovimentacoes({ limit: 100 }),
-        inventoryService.getProdutos({ limit: 200 }),
-      ]);
-
-      const movs = movRes?.data || (Array.isArray(movRes) ? movRes : []);
-      const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
-
+      const { movs, prods } = await fetchMovimentacoesData();
       setMovimentacoes(movs);
       setProdutos(prods);
     } catch (err) {
@@ -45,11 +50,27 @@ export function MovimentacoesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchMovimentacoesData]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    let mounted = true;
+    fetchMovimentacoesData()
+      .then(({ movs, prods }) => {
+        if (mounted) {
+          setMovimentacoes(movs);
+          setProdutos(prods);
+        }
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [fetchMovimentacoesData]);
 
   const handleOpenModal = () => {
     setModalError('');

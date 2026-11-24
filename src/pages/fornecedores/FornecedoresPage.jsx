@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Alert from '../../components/common/Alert';
@@ -23,22 +23,39 @@ export function FornecedoresPage() {
   const [contato, setContato] = useState('');
   const [endereco, setEndereco] = useState('');
 
-  const loadFornecedores = async () => {
+  const fetchFornecedores = useCallback(async () => {
+    const res = await inventoryService.getFornecedores({ limit: 100 });
+    return res?.data || (Array.isArray(res) ? res : []);
+  }, []);
+
+  const loadFornecedores = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await inventoryService.getFornecedores({ limit: 100 });
-      const items = res?.data || (Array.isArray(res) ? res : []);
+      const items = await fetchFornecedores();
       setFornecedores(items);
     } catch (err) {
       setFeedback({ type: 'danger', message: getErrorMessage(err) });
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchFornecedores]);
 
   useEffect(() => {
-    loadFornecedores();
-  }, []);
+    let mounted = true;
+    fetchFornecedores()
+      .then((items) => {
+        if (mounted) setFornecedores(items);
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [fetchFornecedores]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

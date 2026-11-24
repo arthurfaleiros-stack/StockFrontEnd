@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/useAuth';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -35,19 +35,24 @@ export function ProdutosPage() {
     descricao: '',
   });
 
-  const loadData = async () => {
+  const fetchProdutosData = useCallback(async () => {
+    const [prodRes, catRes, fornRes] = await Promise.all([
+      inventoryService.getProdutos({ limit: 100 }),
+      inventoryService.getCategorias({ limit: 100 }),
+      inventoryService.getFornecedores({ limit: 100 }),
+    ]);
+
+    return {
+      prods: prodRes?.data || (Array.isArray(prodRes) ? prodRes : []),
+      cats: catRes?.data || (Array.isArray(catRes) ? catRes : []),
+      forns: fornRes?.data || (Array.isArray(fornRes) ? fornRes : []),
+    };
+  }, []);
+
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [prodRes, catRes, fornRes] = await Promise.all([
-        inventoryService.getProdutos({ limit: 100 }),
-        inventoryService.getCategorias({ limit: 100 }),
-        inventoryService.getFornecedores({ limit: 100 }),
-      ]);
-
-      const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
-      const cats = catRes?.data || (Array.isArray(catRes) ? catRes : []);
-      const forns = fornRes?.data || (Array.isArray(fornRes) ? fornRes : []);
-
+      const { prods, cats, forns } = await fetchProdutosData();
       setProdutos(prods);
       setCategorias(cats);
       setFornecedores(forns);
@@ -56,11 +61,28 @@ export function ProdutosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchProdutosData]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    let mounted = true;
+    fetchProdutosData()
+      .then(({ prods, cats, forns }) => {
+        if (mounted) {
+          setProdutos(prods);
+          setCategorias(cats);
+          setFornecedores(forns);
+        }
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [fetchProdutosData]);
 
   const handleOpenModal = () => {
     setModalError('');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Alert from '../../components/common/Alert';
@@ -21,22 +21,39 @@ export function CategoriasPage() {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
 
-  const loadCategorias = async () => {
+  const fetchCategorias = useCallback(async () => {
+    const res = await inventoryService.getCategorias({ limit: 100 });
+    return res?.data || (Array.isArray(res) ? res : []);
+  }, []);
+
+  const loadCategorias = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await inventoryService.getCategorias({ limit: 100 });
-      const items = res?.data || (Array.isArray(res) ? res : []);
+      const items = await fetchCategorias();
       setCategorias(items);
     } catch (err) {
       setFeedback({ type: 'danger', message: getErrorMessage(err) });
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchCategorias]);
 
   useEffect(() => {
-    loadCategorias();
-  }, []);
+    let mounted = true;
+    fetchCategorias()
+      .then((items) => {
+        if (mounted) setCategorias(items);
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [fetchCategorias]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

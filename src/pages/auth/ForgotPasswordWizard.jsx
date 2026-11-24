@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../api/auth';
 import { getErrorMessage } from '../../utils/errorParser';
 import { isValidEmail } from '../../utils/validators';
@@ -18,7 +18,6 @@ import {
 
 export function ForgotPasswordWizard() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   // Estados do formulário
   const [step, setStep] = useState(1);
@@ -36,21 +35,6 @@ export function ForgotPasswordWizard() {
   const [apiError, setApiError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Auto-preenchimento caso o usuário clique no link recebido por e-mail
-  useEffect(() => {
-    const urlToken = searchParams.get('token') || searchParams.get('codigo');
-    const urlEmail = searchParams.get('email');
-    if (urlEmail) {
-      setEmail(urlEmail);
-    }
-    if (urlToken) {
-      const clean = urlToken.trim();
-      setCodigo(clean);
-      setStep(2);
-      setInfoMessage('Código de verificação carregado automaticamente do link! Defina sua nova senha.');
-    }
-  }, [searchParams]);
 
   // Validação da Etapa 1 (E-mail)
   function validateStep1() {

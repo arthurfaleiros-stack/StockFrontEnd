@@ -15,10 +15,32 @@ import {
   Clock,
   Layers,
   BarChart3,
-  Calendar,
   Sparkles,
 } from 'lucide-react';
 import inventoryService from '../../api/inventory';
+
+const DEFAULT_MONTHLY_SERIES = [
+  { mesNumero: 1, mesNome: 'Jan', totalSaidas: 0 },
+  { mesNumero: 2, mesNome: 'Fev', totalSaidas: 0 },
+  { mesNumero: 3, mesNome: 'Mar', totalSaidas: 0 },
+  { mesNumero: 4, mesNome: 'Abr', totalSaidas: 0 },
+  { mesNumero: 5, mesNome: 'Mai', totalSaidas: 0 },
+  { mesNumero: 6, mesNome: 'Jun', totalSaidas: 0 },
+  { mesNumero: 7, mesNome: 'Jul', totalSaidas: 0 },
+  { mesNumero: 8, mesNome: 'Ago', totalSaidas: 0 },
+  { mesNumero: 9, mesNome: 'Set', totalSaidas: 0 },
+  { mesNumero: 10, mesNome: 'Out', totalSaidas: 0 },
+  { mesNumero: 11, mesNome: 'Nov', totalSaidas: 0 },
+  { mesNumero: 12, mesNome: 'Dez', totalSaidas: 0 },
+];
+
+const EMPTY_SALES_ANALYTICS = {
+  dadosMensais: DEFAULT_MONTHLY_SERIES,
+  mesMaisVendido: null,
+  mesMenosVendido: null,
+  totalAnualSaidas: 0,
+  mediaMensal: 0,
+};
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -38,13 +60,7 @@ export function DashboardPage() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
   const [selectedProductFilter, setSelectedProductFilter] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [salesAnalytics, setSalesAnalytics] = useState({
-    dadosMensais: [],
-    mesMaisVendido: null,
-    mesMenosVendido: null,
-    totalAnualSaidas: 0,
-    mediaMensal: 0,
-  });
+  const [salesAnalytics, setSalesAnalytics] = useState(EMPTY_SALES_ANALYTICS);
   const [loadingChart, setLoadingChart] = useState(false);
 
   useEffect(() => {
@@ -106,11 +122,21 @@ export function DashboardPage() {
         }
 
         const data = await inventoryService.getVendasMensais(params);
-        if (mounted && data) {
-          setSalesAnalytics(data);
+        if (mounted) {
+          setSalesAnalytics({
+            ...EMPTY_SALES_ANALYTICS,
+            ...(data || {}),
+            dadosMensais:
+              Array.isArray(data?.dadosMensais) && data.dadosMensais.length > 0
+                ? data.dadosMensais
+                : DEFAULT_MONTHLY_SERIES,
+          });
         }
       } catch (err) {
         console.warn('Erro ao buscar dados de vendas mensais:', err);
+        if (mounted) {
+          setSalesAnalytics(EMPTY_SALES_ANALYTICS);
+        }
       } finally {
         if (mounted) setLoadingChart(false);
       }
@@ -173,22 +199,26 @@ export function DashboardPage() {
   }, [products]); // Recalcula quando a lista de produtos mudar
 
 
+  const monthlySeries = useMemo(
+    () =>
+      Array.isArray(salesAnalytics.dadosMensais) && salesAnalytics.dadosMensais.length > 0
+        ? salesAnalytics.dadosMensais
+        : DEFAULT_MONTHLY_SERIES,
+    [salesAnalytics.dadosMensais]
+  );
+
   // Encontra a maior quantidade de saídas entre os meses
   const maxMonthlySales = useMemo(() => {
-
-    // Se não houver dados mensais, utiliza 10 como valor padrão
-    if (!salesAnalytics.dadosMensais || salesAnalytics.dadosMensais.length === 0) return 10;
-
     // Obtém o maior número de saídas registrado entre os meses
     const maxVal = Math.max(
-      ...salesAnalytics.dadosMensais.map((m) => m.totalSaidas),
+      ...monthlySeries.map((m) => Number(m.totalSaidas) || 0),
       0
     );
 
     // Se o maior valor for zero ou menor, utiliza 10 como padrão
     return maxVal > 0 ? maxVal : 10;
 
-  }, [salesAnalytics.dadosMensais]); // Recalcula quando os dados mensais mudarem
+  }, [monthlySeries]); // Recalcula quando os dados mensais mudarem
 
 
   return (
@@ -358,16 +388,16 @@ export function DashboardPage() {
           </div>
         }
       >
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
           {/* Indicadores Sazonais (Pico vs Mínimo) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 transition-opacity duration-200 ${loadingChart ? 'opacity-60' : 'opacity-100'}`}>
             <div className="bg-[#121c38] border border-[#1d294d] rounded-xl p-3.5 flex items-center justify-between">
               <div>
                 <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">
                   Mês de Maior Venda / Saída
                 </span>
                 <span className="text-base font-bold text-emerald-400 mt-0.5 block">
-                  {salesAnalytics.mesMaisVendido
+                  {salesAnalytics.mesMaisVendido && Number(salesAnalytics.mesMaisVendido.totalSaidas) > 0
                     ? `${salesAnalytics.mesMaisVendido.mesNome} (${salesAnalytics.mesMaisVendido.totalSaidas} un)`
                     : 'Sem saídas no ano'}
                 </span>
@@ -383,7 +413,7 @@ export function DashboardPage() {
                   Mês de Menor Demanda
                 </span>
                 <span className="text-base font-bold text-amber-400 mt-0.5 block">
-                  {salesAnalytics.mesMenosVendido
+                  {salesAnalytics.mesMenosVendido && Number(salesAnalytics.mesMenosVendido.totalSaidas) > 0
                     ? `${salesAnalytics.mesMenosVendido.mesNome} (${salesAnalytics.mesMenosVendido.totalSaidas} un)`
                     : 'Sem saídas no ano'}
                 </span>
@@ -399,7 +429,7 @@ export function DashboardPage() {
                   Média Mensal de Saída
                 </span>
                 <span className="text-base font-bold text-indigo-300 mt-0.5 block">
-                  {salesAnalytics.mediaMensal} un/mês
+                  {salesAnalytics.mediaMensal ?? 0} un/mês
                 </span>
               </div>
               <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
@@ -410,17 +440,24 @@ export function DashboardPage() {
 
           {/* Área do Gráfico de Barras Responsivo */}
           <div className="pt-2">
-            <div className="h-56 flex items-end gap-2 sm:gap-4 px-2 border-b border-[#1b2649] pb-2">
-              {salesAnalytics.dadosMensais.map((item) => {
-                const heightPercent = maxMonthlySales > 0 ? (item.totalSaidas / maxMonthlySales) * 100 : 0;
-                const isPeak = salesAnalytics.mesMaisVendido?.mesNumero === item.mesNumero && item.totalSaidas > 0;
-                const isLow = salesAnalytics.mesMenosVendido?.mesNumero === item.mesNumero && item.totalSaidas > 0;
+            {loadingChart && (
+              <div className="flex items-center justify-end gap-2 text-[11px] text-indigo-300 mb-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                <span>Atualizando dados do gráfico...</span>
+              </div>
+            )}
+            <div className={`h-56 flex items-end gap-2 sm:gap-4 px-2 border-b border-[#1b2649] pb-2 transition-opacity duration-200 ${loadingChart ? 'opacity-50' : 'opacity-100'}`}>
+              {monthlySeries.map((item) => {
+                const totalSaidas = Number(item.totalSaidas) || 0;
+                const heightPercent = maxMonthlySales > 0 ? (totalSaidas / maxMonthlySales) * 100 : 0;
+                const isPeak = salesAnalytics.mesMaisVendido?.mesNumero === item.mesNumero && totalSaidas > 0;
+                const isLow = salesAnalytics.mesMenosVendido?.mesNumero === item.mesNumero && totalSaidas > 0;
 
                 return (
                   <div key={item.mesNumero} className="flex-1 flex flex-col items-center h-full justify-end group">
                     {/* Tooltip com quantidade ao passar o mouse */}
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-mono font-bold text-white bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded shadow mb-1">
-                      {item.totalSaidas} un
+                      {totalSaidas} un
                     </div>
 
                     {/* Barra */}
@@ -430,11 +467,11 @@ export function DashboardPage() {
                             ? 'bg-gradient-to-t from-emerald-600 to-emerald-400'
                             : isLow
                               ? 'bg-gradient-to-t from-amber-600 to-amber-400'
-                              : item.totalSaidas > 0
+                              : totalSaidas > 0
                                 ? 'bg-gradient-to-t from-indigo-600 to-indigo-400'
                                 : 'bg-transparent'
                           }`}
-                        style={{ height: `${Math.max(heightPercent, item.totalSaidas > 0 ? 4 : 0)}%` }}
+                        style={{ height: `${Math.max(heightPercent, totalSaidas > 0 ? 4 : 0)}%` }}
                       />
                     </div>
 
@@ -455,7 +492,7 @@ export function DashboardPage() {
             </div>
 
             {/* Insight de Priorização Sazonal */}
-            {salesAnalytics.mesMaisVendido ? (
+            {salesAnalytics.mesMaisVendido && Number(salesAnalytics.mesMaisVendido.totalSaidas) > 0 ? (
               <div className="mt-4 p-3.5 bg-indigo-950/40 border border-indigo-500/20 rounded-xl flex items-start gap-3">
                 <Sparkles className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
                 <div className="text-xs text-slate-300">
@@ -503,7 +540,13 @@ export function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#17223e]">
-                  {recentMovements.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                        Carregando movimentações recentes...
+                      </td>
+                    </tr>
+                  ) : recentMovements.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
                         Nenhuma movimentação registrada até o momento.

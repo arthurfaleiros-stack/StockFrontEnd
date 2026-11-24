@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Alert from '../../components/common/Alert';
-import { RoleBadge, StatusBadge } from '../../components/common/Badge';
-import { Search, CreditCard, UserPlus, Calendar } from 'lucide-react';
+import { StatusBadge } from '../../components/common/Badge';
+import { Search, CreditCard, UserPlus } from 'lucide-react';
 import inventoryService from '../../api/inventory';
 import { getErrorMessage } from '../../utils/errorParser';
 import { useAuth } from '../../context/useAuth';
 
 export function AssinaturasPage() {
-  const { hasRole, user } = useAuth();
+  const { hasRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [assinaturas, setAssinaturas] = useState([]);
   const [minhaAssinatura, setMinhaAssinatura] = useState(null);
@@ -29,28 +29,52 @@ export function AssinaturasPage() {
 
   const canManage = hasRole(['ADMIN']);
 
-  const loadData = async () => {
+  const fetchAssinaturasData = useCallback(async () => {
+    if (canManage) {
+      const res = await inventoryService.getAssinaturas({ limit: 100 });
+      return { type: 'list', items: res?.data || (Array.isArray(res) ? res : []) };
+    }
+    const res = await inventoryService.getMinhaAssinatura();
+    return { type: 'single', item: res };
+  }, [canManage]);
+
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
-
-      if (canManage) {
-        const res = await inventoryService.getAssinaturas({ limit: 100 });
-        const items = res?.data || (Array.isArray(res) ? res : []);
-        setAssinaturas(items);
+      const result = await fetchAssinaturasData();
+      if (result.type === 'list') {
+        setAssinaturas(result.items);
       } else {
-        const res = await inventoryService.getMinhaAssinatura();
-        setMinhaAssinatura(res);
+        setMinhaAssinatura(result.item);
       }
     } catch (err) {
       setFeedback({ type: 'danger', message: getErrorMessage(err) });
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchAssinaturasData]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    let mounted = true;
+    fetchAssinaturasData()
+      .then((result) => {
+        if (!mounted) return;
+        if (result.type === 'list') {
+          setAssinaturas(result.items);
+        } else {
+          setMinhaAssinatura(result.item);
+        }
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [fetchAssinaturasData]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
