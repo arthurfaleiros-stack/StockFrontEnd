@@ -23,22 +23,33 @@ export function FornecedoresPage() {
   const [contato, setContato] = useState('');
   const [endereco, setEndereco] = useState('');
 
-  const loadFornecedores = async () => {
-    try {
-      setLoading(true);
-      const res = await inventoryService.getFornecedores({ limit: 100 });
-      const items = res?.data || (Array.isArray(res) ? res : []);
-      setFornecedores(items);
-    } catch (err) {
-      setFeedback({ type: 'danger', message: getErrorMessage(err) });
-    } finally {
-      setLoading(false);
-    }
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const loadFornecedores = () => {
+    setLoading(true);
+    setReloadKey((k) => k + 1);
   };
 
   useEffect(() => {
-    loadFornecedores();
-  }, []);
+    let cancelled = false;
+    async function fetchFornecedores() {
+      try {
+        const res = await inventoryService.getFornecedores({ limit: 100 });
+        const items = res?.data || (Array.isArray(res) ? res : []);
+        if (!cancelled) setFornecedores(items);
+      } catch (err) {
+        if (!cancelled) {
+          setFeedback({ type: 'danger', message: getErrorMessage(err) });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchFornecedores();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
