@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -30,38 +30,52 @@ export function AssinaturasPage() {
 
   const canManage = hasRole(['ADMIN']);
 
-  const loadData = () => {
-    setLoading(true);
-    setReloadKey((k) => k + 1);
-  };
+  const fetchAssinaturasData = useCallback(async () => {
+    if (canManage) {
+      const res = await inventoryService.getAssinaturas({ limit: 100 });
+      return { type: 'list', items: res?.data || (Array.isArray(res) ? res : []) };
+    }
+    const res = await inventoryService.getMinhaAssinatura();
+    return { type: 'single', item: res };
+  }, [canManage]);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await fetchAssinaturasData();
+      if (result.type === 'list') {
+        setAssinaturas(result.items);
+      } else {
+        setMinhaAssinatura(result.item);
+      }
+    } catch (err) {
+      setFeedback({ type: 'danger', message: getErrorMessage(err) });
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchAssinaturasData]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function fetchData() {
-      try {
-        if (canManage) {
-          const res = await inventoryService.getAssinaturas({ limit: 100 });
-          const items = res?.data || (Array.isArray(res) ? res : []);
-          if (!cancelled) setAssinaturas(items);
+    let mounted = true;
+    fetchAssinaturasData()
+      .then((result) => {
+        if (!mounted) return;
+        if (result.type === 'list') {
+          setAssinaturas(result.items);
         } else {
-          const res = await inventoryService.getMinhaAssinatura();
-          if (!cancelled) setMinhaAssinatura(res);
+          setMinhaAssinatura(result.item);
         }
-      } catch (err) {
-        if (!cancelled) {
-          setFeedback({ type: 'danger', message: getErrorMessage(err) });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    fetchData();
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
     return () => {
-      cancelled = true;
+      mounted = false;
     };
-  }, [canManage, reloadKey]);
+  }, [fetchAssinaturasData]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

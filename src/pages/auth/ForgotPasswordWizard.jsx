@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../../api/auth';
 import { getErrorMessage } from '../../utils/errorParser';
 import { isValidEmail } from '../../utils/validators';
@@ -18,10 +18,6 @@ import {
 
 export function ForgotPasswordWizard() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  const urlToken = searchParams.get('token') || searchParams.get('codigo');
-  const urlEmail = searchParams.get('email');
 
   // Estados do formulário
   const [step, setStep] = useState(() => (urlToken ? 2 : 1));

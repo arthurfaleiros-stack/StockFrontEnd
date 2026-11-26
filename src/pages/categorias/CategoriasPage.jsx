@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Alert from '../../components/common/Alert';
@@ -21,33 +21,39 @@ export function CategoriasPage() {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
 
-  const [reloadKey, setReloadKey] = useState(0);
+  const fetchCategorias = useCallback(async () => {
+    const res = await inventoryService.getCategorias({ limit: 100 });
+    return res?.data || (Array.isArray(res) ? res : []);
+  }, []);
 
-  const loadCategorias = () => {
-    setLoading(true);
-    setReloadKey((k) => k + 1);
-  };
+  const loadCategorias = useCallback(async () => {
+    try {
+      setLoading(true);
+      const items = await fetchCategorias();
+      setCategorias(items);
+    } catch (err) {
+      setFeedback({ type: 'danger', message: getErrorMessage(err) });
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchCategorias]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function fetchCategorias() {
-      try {
-        const res = await inventoryService.getCategorias({ limit: 100 });
-        const items = res?.data || (Array.isArray(res) ? res : []);
-        if (!cancelled) setCategorias(items);
-      } catch (err) {
-        if (!cancelled) {
-          setFeedback({ type: 'danger', message: getErrorMessage(err) });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    fetchCategorias();
+    let mounted = true;
+    fetchCategorias()
+      .then((items) => {
+        if (mounted) setCategorias(items);
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
     return () => {
-      cancelled = true;
+      mounted = false;
     };
-  }, [reloadKey]);
+  }, [fetchCategorias]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/useAuth';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
@@ -48,47 +48,54 @@ export function ProdutosPage() {
     descricao: '',
   });
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchProdutosData = useCallback(async () => {
+    const [prodRes, catRes, fornRes] = await Promise.all([
+      inventoryService.getProdutos({ limit: 100 }),
+      inventoryService.getCategorias({ limit: 100 }),
+      inventoryService.getFornecedores({ limit: 100 }),
+    ]);
 
-    async function fetchAll() {
-      try {
-        const [prodRes, catRes, fornRes] = await Promise.all([
-          inventoryService.getProdutos({ limit: 100 }),
-          inventoryService.getCategorias({ limit: 100 }),
-          inventoryService.getFornecedores({ limit: 100 }),
-        ]);
-
-        if (cancelled) return;
-
-        const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
-        const cats = catRes?.data || (Array.isArray(catRes) ? catRes : []);
-        const forns = fornRes?.data || (Array.isArray(fornRes) ? fornRes : []);
-
-        setProdutos(prods);
-        setCategorias(cats);
-        setFornecedores(forns);
-      } catch (err) {
-        if (!cancelled) {
-          setFeedback({ type: 'error', message: getErrorMessage(err) });
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchAll();
-    return () => {
-      cancelled = true;
+    return {
+      prods: prodRes?.data || (Array.isArray(prodRes) ? prodRes : []),
+      cats: catRes?.data || (Array.isArray(catRes) ? catRes : []),
+      forns: fornRes?.data || (Array.isArray(fornRes) ? fornRes : []),
     };
-  }, [reloadKey]);
+  }, []);
 
-  const triggerReload = () => {
-    setLoading(true);
-    setReloadKey((k) => k + 1);
-  };
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { prods, cats, forns } = await fetchProdutosData();
+      setProdutos(prods);
+      setCategorias(cats);
+      setFornecedores(forns);
+    } catch (err) {
+      setFeedback({ type: 'danger', message: getErrorMessage(err) });
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchProdutosData]);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchProdutosData()
+      .then(({ prods, cats, forns }) => {
+        if (mounted) {
+          setProdutos(prods);
+          setCategorias(cats);
+          setFornecedores(forns);
+        }
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [fetchProdutosData]);
 
   const handleOpenModal = () => {
     setModalError('');

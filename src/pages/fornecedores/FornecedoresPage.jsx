@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Alert from '../../components/common/Alert';
@@ -23,33 +23,39 @@ export function FornecedoresPage() {
   const [contato, setContato] = useState('');
   const [endereco, setEndereco] = useState('');
 
-  const [reloadKey, setReloadKey] = useState(0);
+  const fetchFornecedores = useCallback(async () => {
+    const res = await inventoryService.getFornecedores({ limit: 100 });
+    return res?.data || (Array.isArray(res) ? res : []);
+  }, []);
 
-  const loadFornecedores = () => {
-    setLoading(true);
-    setReloadKey((k) => k + 1);
-  };
+  const loadFornecedores = useCallback(async () => {
+    try {
+      setLoading(true);
+      const items = await fetchFornecedores();
+      setFornecedores(items);
+    } catch (err) {
+      setFeedback({ type: 'danger', message: getErrorMessage(err) });
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchFornecedores]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function fetchFornecedores() {
-      try {
-        const res = await inventoryService.getFornecedores({ limit: 100 });
-        const items = res?.data || (Array.isArray(res) ? res : []);
-        if (!cancelled) setFornecedores(items);
-      } catch (err) {
-        if (!cancelled) {
-          setFeedback({ type: 'danger', message: getErrorMessage(err) });
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    fetchFornecedores();
+    let mounted = true;
+    fetchFornecedores()
+      .then((items) => {
+        if (mounted) setFornecedores(items);
+      })
+      .catch((err) => {
+        if (mounted) setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
     return () => {
-      cancelled = true;
+      mounted = false;
     };
-  }, [reloadKey]);
+  }, [fetchFornecedores]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
