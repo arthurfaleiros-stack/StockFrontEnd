@@ -7,6 +7,7 @@ const pageTitles = {
   '/dashboard': 'Visão Geral & Métricas',
   '/produtos': 'Catálogo de Produtos',
   '/movimentacoes': 'Movimentações de Estoque',
+  '/previsao-ruptura': 'Previsão de Ruptura',
   '/categorias': 'Gestão de Categorias',
   '/fornecedores': 'Gestão de Fornecedores',
   '/historico': 'Histórico & Trilha de Auditoria',

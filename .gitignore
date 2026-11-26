@@ -1,3 +1,4 @@
 /node_modules
 /.oxlintrc.json
 /.env
+/dist

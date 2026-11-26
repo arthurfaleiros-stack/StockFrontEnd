@@ -43,8 +43,8 @@ export const inventoryService = {
   },
 
   // Previsão de Ruptura por Produto
-  async getPrevisaoRuptura(produtoId) {
-    const res = await apiClient.get(`/api/v1/produtos/${produtoId}/previsao-ruptura`);
+  async getPrevisaoRuptura(produtoId, params = {}) {
+    const res = await apiClient.get(`/api/v1/produtos/${produtoId}/previsao-ruptura`, { params });
     return res.data;
   },
 

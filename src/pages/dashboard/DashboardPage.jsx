@@ -1,9 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
+import Alert from '../../components/common/Alert';
 import { RoleBadge } from '../../components/common/Badge';
+import SalesSeasonalityChart from '../../components/charts/SalesSeasonalityChart';
+import CategoryDistributionChart from '../../components/charts/CategoryDistributionChart';
+import RuptureQuickWidget from '../../components/ruptura/RuptureQuickWidget';
+import PrevisaoRupturaModal from '../../components/ruptura/PrevisaoRupturaModal';
 import {
   Package,
   TrendingUp,
@@ -13,12 +18,11 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Clock,
-  Layers,
-  BarChart3,
-  Calendar,
-  Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 import inventoryService from '../../api/inventory';
+import { getErrorMessage } from '../../utils/errorParser';
+import { formatNumberBr } from '../../utils/formatters';
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -30,10 +34,14 @@ export function DashboardPage() {
   });
 
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [recentMovements, setRecentMovements] = useState([]);
+  const [riscoRuptura, setRiscoRuptura] = useState({ total: 0, data: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   // Estados do Gráfico de Sazonalidade de Vendas
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
   const [selectedProductFilter, setSelectedProductFilter] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [salesAnalytics, setSalesAnalytics] = useState({
@@ -43,39 +51,82 @@ export function DashboardPage() {
     totalAnualSaidas: 0,
     mediaMensal: 0,
   });
-  const [loadingChart, setLoadingChart] = useState(false);
+  const [loadingChart, setLoadingChart] = useState(true);
+
+  // Modal de Previsão de Ruptura pelo Widget
+  const [selectedRupturaProduct, setSelectedRupturaProduct] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     async function loadData() {
       try {
-        setLoading(true);
-        const [prodRes, movRes] = await Promise.all([
+        const [summaryRes, prodRes, catRes, movRes, riscoRes] = await Promise.allSettled([
+          inventoryService.getDashboardSummary(),
           inventoryService.getProdutos({ limit: 100 }),
+          inventoryService.getCategorias({ limit: 100 }),
           inventoryService.getMovimentacoes({ limit: 5 }),
+          inventoryService.getRiscoRuptura({ dias: 30, limite_dias: 7 }),
         ]);
 
-        const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
-        const movs = movRes?.data || (Array.isArray(movRes) ? movRes : []);
+        if (!mounted) return;
 
-        if (mounted) {
-          setProducts(prods);
+        const prods =
+          prodRes.status === 'fulfilled'
+            ? prodRes.value?.data || (Array.isArray(prodRes.value) ? prodRes.value : [])
+            : [];
+        const cats =
+          catRes.status === 'fulfilled'
+            ? catRes.value?.data || (Array.isArray(catRes.value) ? catRes.value : [])
+            : [];
+        const movs =
+          movRes.status === 'fulfilled'
+            ? movRes.value?.data || (Array.isArray(movRes.value) ? movRes.value : [])
+            : [];
+
+        setProducts(prods);
+        setCategories(cats);
+        setRecentMovements(movs);
+
+        if (riscoRes.status === 'fulfilled' && riscoRes.value) {
+          setRiscoRuptura(riscoRes.value);
+        }
+
+        if (summaryRes.status === 'fulfilled' && summaryRes.value) {
+          const s = summaryRes.value;
+          setMetrics({
+            totalProdutos: Number(s.totalProdutos) || 0,
+            totalEstoqueFisico: Number(s.totalEstoqueFisico) || 0,
+            itensEstoqueBaixo: Number(s.itensEstoqueBaixo) || 0,
+            movimentacoesTotal: Number(s.movimentacoesTotal) || 0,
+          });
+        } else {
+          // Fallback caso o endpoint resumo falhe
           const totalQtd = prods.reduce((acc, p) => acc + (Number(p.quantidade_atual) || 0), 0);
           const baixo = prods.filter(
             (p) => Number(p.quantidade_atual || 0) <= Number(p.quantidade_minima || 0)
           ).length;
 
           setMetrics({
-            totalProdutos: prodRes?.pagination?.total ?? prods.length,
+            totalProdutos:
+              prodRes.status === 'fulfilled'
+                ? prodRes.value?.pagination?.total ?? prods.length
+                : 0,
             totalEstoqueFisico: totalQtd,
             itensEstoqueBaixo: baixo,
-            movimentacoesTotal: movRes?.pagination?.total ?? movs.length,
+            movimentacoesTotal:
+              movRes.status === 'fulfilled'
+                ? movRes.value?.pagination?.total ?? movs.length
+                : 0,
           });
 
-          setRecentMovements(movs);
+          if (summaryRes.status === 'rejected') {
+            setError(getErrorMessage(summaryRes.reason));
+          }
         }
       } catch (err) {
-        console.warn('Erro ao carregar dados do Dashboard:', err);
+        if (mounted) {
+          setError(getErrorMessage(err));
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -91,8 +142,10 @@ export function DashboardPage() {
     let mounted = true;
     async function fetchSalesChart() {
       try {
-        setLoadingChart(true);
         const params = { ano: selectedYear };
+        if (selectedCategoryFilter) {
+          params.categoria_id = selectedCategoryFilter;
+        }
         if (selectedProductFilter) {
           params.produto_id = selectedProductFilter;
         }
@@ -111,61 +164,49 @@ export function DashboardPage() {
     return () => {
       mounted = false;
     };
-  }, [selectedProductFilter, selectedYear]);
+  }, [selectedCategoryFilter, selectedProductFilter, selectedYear]);
 
-  // Cálculo dinâmico da distribuição de categorias a partir dos produtos reais
-  const categoryStats = useMemo(() => {
-    if (!products || products.length === 0) return [];
-    const counts = {};
-    products.forEach((p) => {
-      const cat = p.categoria_nome || 'Geral / Sem Categoria';
-      counts[cat] = (counts[cat] || 0) + 1;
-    });
+  const handleCategoryChange = (nextCategoryId) => {
+    setLoadingChart(true);
+    setSelectedCategoryFilter(nextCategoryId);
+    if (nextCategoryId && selectedProductFilter) {
+      const selectedProd = products.find(
+        (p) => String(p.id) === String(selectedProductFilter)
+      );
+      if (selectedProd && String(selectedProd.categoria_id) !== String(nextCategoryId)) {
+        setSelectedProductFilter('');
+      }
+    }
+  };
 
-    const total = products.length;
-    const colors = [
-      'bg-indigo-500',
-      'bg-blue-500',
-      'bg-violet-500',
-      'bg-emerald-500',
-      'bg-cyan-500',
-      'bg-amber-500',
-    ];
+  const handleProductChange = (nextProductId) => {
+    setLoadingChart(true);
+    setSelectedProductFilter(nextProductId);
+  };
 
-    return Object.entries(counts)
-      .map(([nome, count], idx) => ({
-        nome,
-        count,
-        percent: Math.round((count / total) * 100),
-        color: colors[idx % colors.length],
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [products]);
-
-  // Valor máximo para dimensionar a altura das barras do gráfico
-  const maxMonthlySales = useMemo(() => {
-    if (!salesAnalytics.dadosMensais || salesAnalytics.dadosMensais.length === 0) return 10;
-    const maxVal = Math.max(...salesAnalytics.dadosMensais.map((m) => m.totalSaidas), 0);
-    return maxVal > 0 ? maxVal : 10;
-  }, [salesAnalytics.dadosMensais]);
+  const handleYearChange = (nextYear) => {
+    setLoadingChart(true);
+    setSelectedYear(nextYear);
+  };
 
   return (
     <div className="space-y-6">
       {/* Boas-vindas e Perfil */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0d152b] border border-[#1b2649] rounded-2xl p-6 shadow-xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0d152b] border border-[#1b2649] rounded-2xl p-5 sm:p-6 shadow-xl">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-xl sm:text-2xl font-black text-white">
               Olá, {user?.nome || 'Operador'}!
             </h1>
             <RoleBadge role={user?.perfil} size="md" />
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Painel consolidado de estoque em tempo real na plataforma <span className="text-indigo-300 font-semibold">KeepStock</span>.
+            Painel consolidado de estoque em tempo real na plataforma{' '}
+            <span className="text-indigo-300 font-semibold">KeepStock</span>.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link to="/movimentacoes">
             <Button variant="secondary" icon={ArrowLeftRight}>
               Registrar Movimentação
@@ -179,7 +220,13 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Grid de Métricas Principais */}
+      {error && (
+        <Alert type="error" onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Grid de Métricas Principais (via getDashboardSummary) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Produtos */}
         <div className="bg-[#0e162c] border border-[#1d294d] rounded-2xl p-5 shadow-lg">
@@ -191,20 +238,24 @@ export function DashboardPage() {
               <Package className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-white">
-              {metrics.totalProdutos}
-            </span>
-            {metrics.totalProdutos > 0 ? (
-              <span className="text-xs text-emerald-400 font-medium flex items-center">
-                <ArrowUpRight className="w-3 h-3" /> Catálogo Ativo
+          {loading ? (
+            <div className="h-8 w-24 bg-[#1b2649] rounded animate-pulse" />
+          ) : (
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-white">
+                {formatNumberBr(metrics.totalProdutos)}
               </span>
-            ) : (
-              <span className="text-xs text-slate-500 font-medium">
-                Sem itens cadastrados
-              </span>
-            )}
-          </div>
+              {metrics.totalProdutos > 0 ? (
+                <span className="text-xs text-emerald-400 font-medium flex items-center">
+                  <ArrowUpRight className="w-3 h-3" /> Catálogo Ativo
+                </span>
+              ) : (
+                <span className="text-xs text-slate-500 font-medium">
+                  Sem itens cadastrados
+                </span>
+              )}
+            </div>
+          )}
           <p className="text-[11px] text-slate-400 mt-2">Itens com SKU cadastrado no catálogo</p>
         </div>
 
@@ -218,12 +269,16 @@ export function DashboardPage() {
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-white">
-              {Number(metrics.totalEstoqueFisico).toLocaleString('pt-BR')}
-            </span>
-            <span className="text-xs text-indigo-300 font-medium">unidades</span>
-          </div>
+          {loading ? (
+            <div className="h-8 w-28 bg-[#1b2649] rounded animate-pulse" />
+          ) : (
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-white">
+                {formatNumberBr(metrics.totalEstoqueFisico)}
+              </span>
+              <span className="text-xs text-indigo-300 font-medium">unidades</span>
+            </div>
+          )}
           <p className="text-[11px] text-slate-400 mt-2">Volume consolidado de itens em estoque</p>
         </div>
 
@@ -237,12 +292,16 @@ export function DashboardPage() {
               <AlertTriangle className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-amber-400">
-              {metrics.itensEstoqueBaixo}
-            </span>
-            <span className="text-xs text-amber-300 font-medium">itens requerem reposição</span>
-          </div>
+          {loading ? (
+            <div className="h-8 w-24 bg-[#1b2649] rounded animate-pulse" />
+          ) : (
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-amber-400">
+                {formatNumberBr(metrics.itensEstoqueBaixo)}
+              </span>
+              <span className="text-xs text-amber-300 font-medium">itens requerem reposição</span>
+            </div>
+          )}
           <p className="text-[11px] text-slate-400 mt-2">Abaixo do ponto de pedido configurado</p>
         </div>
 
@@ -256,169 +315,45 @@ export function DashboardPage() {
               <ArrowLeftRight className="w-5 h-5" />
             </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-white">
-              {metrics.movimentacoesTotal}
-            </span>
-            <span className="text-xs text-slate-400 font-medium">operações auditadas</span>
-          </div>
+          {loading ? (
+            <div className="h-8 w-24 bg-[#1b2649] rounded animate-pulse" />
+          ) : (
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-white">
+                {formatNumberBr(metrics.movimentacoesTotal)}
+              </span>
+              <span className="text-xs text-slate-400 font-medium">operações auditadas</span>
+            </div>
+          )}
           <p className="text-[11px] text-slate-400 mt-2">Entradas, saídas e ajustes no armazém</p>
         </div>
       </div>
 
-      {/* NOVO: Gráfico Funcional de Vendas & Análise Sazonal de Priorização */}
-      <Card
-        title="Histórico de Vendas & Análise Sazonal"
-        subtitle="Identifique os meses de maior e menor demanda para planejar compras e priorizar o estoque"
-        icon={BarChart3}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={selectedProductFilter}
-              onChange={(e) => setSelectedProductFilter(e.target.value)}
-              className="bg-[#10172a] border border-[#1e294b] text-slate-200 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Todos os Produtos (Geral)</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome} ({p.codigo})
-                </option>
-              ))}
-            </select>
+      {/* Gráfico Funcional de Vendas & Análise Sazonal */}
+      <SalesSeasonalityChart
+        salesAnalytics={salesAnalytics}
+        loading={loadingChart}
+        products={products}
+        categories={categories}
+        selectedCategoryFilter={selectedCategoryFilter}
+        onCategoryChange={handleCategoryChange}
+        selectedProductFilter={selectedProductFilter}
+        onProductChange={handleProductChange}
+        selectedYear={selectedYear}
+        onYearChange={handleYearChange}
+      />
 
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="bg-[#10172a] border border-[#1e294b] text-slate-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value={2026}>2026</option>
-              <option value={2025}>2025</option>
-              <option value={2024}>2024</option>
-            </select>
-          </div>
-        }
-      >
-        <div className="space-y-6">
-          {/* Indicadores Sazonais (Pico vs Mínimo) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[#121c38] border border-[#1d294d] rounded-xl p-3.5 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">
-                  Mês de Maior Venda / Saída
-                </span>
-                <span className="text-base font-bold text-emerald-400 mt-0.5 block">
-                  {salesAnalytics.mesMaisVendido
-                    ? `${salesAnalytics.mesMaisVendido.mesNome} (${salesAnalytics.mesMaisVendido.totalSaidas} un)`
-                    : 'Sem saídas no ano'}
-                </span>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                <ArrowUpRight className="w-4 h-4" />
-              </div>
-            </div>
+      {/* Widget de Alerta Rápido de Ruptura */}
+      <RuptureQuickWidget
+        riscoData={riscoRuptura}
+        loading={loading}
+        onSelectProduct={(item) => setSelectedRupturaProduct(item)}
+      />
 
-            <div className="bg-[#121c38] border border-[#1d294d] rounded-xl p-3.5 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">
-                  Mês de Menor Demanda
-                </span>
-                <span className="text-base font-bold text-amber-400 mt-0.5 block">
-                  {salesAnalytics.mesMenosVendido
-                    ? `${salesAnalytics.mesMenosVendido.mesNome} (${salesAnalytics.mesMenosVendido.totalSaidas} un)`
-                    : 'Sem saídas no ano'}
-                </span>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                <ArrowDownRight className="w-4 h-4" />
-              </div>
-            </div>
-
-            <div className="bg-[#121c38] border border-[#1d294d] rounded-xl p-3.5 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] uppercase tracking-wider text-slate-400 block font-semibold">
-                  Média Mensal de Saída
-                </span>
-                <span className="text-base font-bold text-indigo-300 mt-0.5 block">
-                  {salesAnalytics.mediaMensal} un/mês
-                </span>
-              </div>
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-            </div>
-          </div>
-
-          {/* Área do Gráfico de Barras Responsivo */}
-          <div className="pt-2">
-            <div className="h-56 flex items-end gap-2 sm:gap-4 px-2 border-b border-[#1b2649] pb-2">
-              {salesAnalytics.dadosMensais.map((item) => {
-                const heightPercent = maxMonthlySales > 0 ? (item.totalSaidas / maxMonthlySales) * 100 : 0;
-                const isPeak = salesAnalytics.mesMaisVendido?.mesNumero === item.mesNumero && item.totalSaidas > 0;
-                const isLow = salesAnalytics.mesMenosVendido?.mesNumero === item.mesNumero && item.totalSaidas > 0;
-
-                return (
-                  <div key={item.mesNumero} className="flex-1 flex flex-col items-center h-full justify-end group">
-                    {/* Tooltip com quantidade ao passar o mouse */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] font-mono font-bold text-white bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded shadow mb-1">
-                      {item.totalSaidas} un
-                    </div>
-
-                    {/* Barra */}
-                    <div className="w-full bg-[#152142] rounded-t-lg h-full flex items-end overflow-hidden">
-                      <div
-                        className={`w-full transition-all duration-500 rounded-t-lg ${
-                          isPeak
-                            ? 'bg-gradient-to-t from-emerald-600 to-emerald-400'
-                            : isLow
-                            ? 'bg-gradient-to-t from-amber-600 to-amber-400'
-                            : item.totalSaidas > 0
-                            ? 'bg-gradient-to-t from-indigo-600 to-indigo-400'
-                            : 'bg-transparent'
-                        }`}
-                        style={{ height: `${Math.max(heightPercent, item.totalSaidas > 0 ? 8 : 2)}%` }}
-                      />
-                    </div>
-
-                    {/* Rótulo do Mês */}
-                    <span
-                      className={`text-[11px] mt-2 font-medium ${
-                        isPeak
-                          ? 'text-emerald-400 font-bold'
-                          : isLow
-                          ? 'text-amber-400 font-bold'
-                          : 'text-slate-400'
-                      }`}
-                    >
-                      {item.mesNome}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Insight de Priorização Sazonal */}
-            {salesAnalytics.mesMaisVendido ? (
-              <div className="mt-4 p-3.5 bg-indigo-950/40 border border-indigo-500/20 rounded-xl flex items-start gap-3">
-                <Sparkles className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-                <div className="text-xs text-slate-300">
-                  <span className="font-semibold text-white">Recomendação Estratégica: </span>
-                  O maior volume de saídas ocorre em <strong className="text-emerald-400">{salesAnalytics.mesMaisVendido.mesNome}</strong>.
-                  Para evitar risco de desabastecimento (ruptura), programe reposição com fornecedores de 30 a 60 dias antes deste mês crítico.
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500 text-center mt-3">
-                Nenhuma movimentação de saída registrada para o período selecionado. À medida que vendas ou saídas forem computadas, o gráfico refletirá o padrão de consumo.
-              </p>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      {/* Seção Central: Movimentações Recentes & Status do Armazém */}
+      {/* Seção Central: Movimentações Recentes & Distribuição por Categoria */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tabela de Movimentações Recentes (2 colunas) */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 min-w-0">
           <Card
             title="Últimas Movimentações de Estoque"
             subtitle="Registro cronológico das operações recentes no sistema"
@@ -440,12 +375,18 @@ export function DashboardPage() {
                     <th className="pb-3 font-semibold">Tipo</th>
                     <th className="pb-3 font-semibold">Produto</th>
                     <th className="pb-3 font-semibold text-center">Quantidade</th>
-                    <th className="pb-3 font-semibold">Operador</th>
+                    <th className="pb-3 font-semibold hidden sm:table-cell">Operador</th>
                     <th className="pb-3 font-semibold text-right">Data/Hora</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#17223e]">
-                  {recentMovements.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                        Carregando movimentações recentes...
+                      </td>
+                    </tr>
+                  ) : recentMovements.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
                         Nenhuma movimentação registrada até o momento.
@@ -454,7 +395,7 @@ export function DashboardPage() {
                   ) : (
                     recentMovements.map((mov) => (
                       <tr key={mov.id} className="hover:bg-[#121c38]/50 transition-colors">
-                        <td className="py-3.5">
+                        <td className="py-3.5 pr-2">
                           <span
                             className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
                               mov.tipo === 'ENTRADA'
@@ -474,16 +415,16 @@ export function DashboardPage() {
                             {mov.tipo}
                           </span>
                         </td>
-                        <td className="py-3.5 font-medium text-slate-200">
+                        <td className="py-3.5 pr-2 font-medium text-slate-200">
                           {mov.produto_nome || mov.produto}
                         </td>
-                        <td className="py-3.5 text-center font-mono font-bold text-white">
+                        <td className="py-3.5 px-2 text-center font-mono font-bold text-white whitespace-nowrap">
                           {mov.quantidade} un
                         </td>
-                        <td className="py-3.5 text-xs text-slate-400">
+                        <td className="py-3.5 px-2 text-xs text-slate-400 hidden sm:table-cell">
                           {mov.usuario_nome || mov.responsavel || 'Sistema'}
                         </td>
-                        <td className="py-3.5 text-right text-xs text-slate-400 font-mono">
+                        <td className="py-3.5 pl-2 text-right text-xs text-slate-400 font-mono whitespace-nowrap">
                           {mov.data_hora
                             ? new Date(mov.data_hora).toLocaleDateString('pt-BR', {
                                 day: '2-digit',
@@ -502,61 +443,23 @@ export function DashboardPage() {
           </Card>
         </div>
 
-        {/* Resumo de Categorias Dinâmico (1 coluna) */}
-        <div className="space-y-6">
-          <Card
-            title="Distribuição por Categoria"
-            subtitle="Composição de mercadorias no catálogo"
-            icon={Layers}
-          >
-            {categoryStats.length === 0 ? (
-              <div className="py-8 text-center text-slate-400">
-                <Layers className="w-8 h-8 mx-auto text-slate-600 mb-2 opacity-50" />
-                <p className="text-xs">Nenhum produto cadastrado ainda.</p>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Cadastre produtos no catálogo para visualizar a distribuição real.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {categoryStats.map((cat) => (
-                  <div key={cat.nome}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-slate-300 font-medium">{cat.nome}</span>
-                      <span className="text-slate-400 font-mono">
-                        {cat.percent}% ({cat.count} {cat.count === 1 ? 'item' : 'itens'})
-                      </span>
-                    </div>
-                    <div className="h-2 bg-[#172344] rounded-full overflow-hidden">
-                      <div
-                        className={`h-full ${cat.color} rounded-full transition-all duration-300`}
-                        style={{ width: `${cat.percent}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-6 pt-4 border-t border-[#172342] flex items-center justify-between text-xs">
-              <span className="text-slate-400">Status Operacional</span>
-              <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Estoque Sincronizado
-              </span>
-            </div>
-          </Card>
+        {/* Gráfico Interativo de Distribuição por Categoria (1 coluna) */}
+        <div className="min-w-0">
+          <CategoryDistributionChart products={products} loading={loading} />
         </div>
       </div>
-    </div>
-  );
-}
 
-function ArrowRight(props) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
+      {/* Modal de Previsão Individual aberto pelo Widget */}
+      {selectedRupturaProduct && (
+        <PrevisaoRupturaModal
+          produtoId={selectedRupturaProduct.produto_id}
+          initialProduct={selectedRupturaProduct}
+          initialDias={30}
+          initialLimiteDias={7}
+          onClose={() => setSelectedRupturaProduct(null)}
+        />
+      )}
+    </div>
   );
 }
 

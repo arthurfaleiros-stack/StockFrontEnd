@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -9,11 +9,20 @@ import inventoryService from '../../api/inventory';
 import { getErrorMessage } from '../../utils/errorParser';
 
 export function MovimentacoesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialQueryRef = useRef({
+    produtoId: searchParams.get('produto_id') || '',
+    tipo: searchParams.get('tipo') || '',
+    quantidade: searchParams.get('quantidade') || '',
+    open: searchParams.get('open') === '1',
+  });
+
   const [filterType, setFilterType] = useState('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Modal de nova movimentação
   const [showModal, setShowModal] = useState(false);
@@ -27,29 +36,65 @@ export function MovimentacoesPage() {
   const [novaQtd, setNovaQtd] = useState(1);
   const [novoMotivo, setNovoMotivo] = useState('');
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [movRes, prodRes] = await Promise.all([
-        inventoryService.getMovimentacoes({ limit: 100 }),
-        inventoryService.getProdutos({ limit: 200 }),
-      ]);
-
-      const movs = movRes?.data || (Array.isArray(movRes) ? movRes : []);
-      const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
-
-      setMovimentacoes(movs);
-      setProdutos(prods);
-    } catch (err) {
-      setFeedback({ type: 'danger', message: getErrorMessage(err) });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadData();
-  }, []);
+    let cancelled = false;
+
+    async function fetchMovimentacoes() {
+      try {
+        const [movRes, prodRes] = await Promise.all([
+          inventoryService.getMovimentacoes({ limit: 100 }),
+          inventoryService.getProdutos({ limit: 200 }),
+        ]);
+
+        if (cancelled) return;
+
+        const movs = movRes?.data || (Array.isArray(movRes) ? movRes : []);
+        const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
+
+        setMovimentacoes(movs);
+        setProdutos(prods);
+
+        // Pré-seleção automática ao navegar da Previsão de Ruptura
+        const pending = initialQueryRef.current;
+        if (pending && (pending.open || pending.produtoId)) {
+          const validTypes = ['ENTRADA', 'SAIDA', 'AJUSTE'];
+          const upperTipo = (pending.tipo || 'ENTRADA').toUpperCase();
+          setNovoTipo(validTypes.includes(upperTipo) ? upperTipo : 'ENTRADA');
+
+          const matchedProd = prods.find(
+            (p) => String(p.id) === String(pending.produtoId)
+          );
+          if (matchedProd) {
+            setSelectedProdutoId(String(matchedProd.id));
+          } else if (prods.length > 0) {
+            setSelectedProdutoId(String(prods[0].id));
+          }
+
+          const parsedQty = parseInt(pending.quantidade, 10);
+          if (Number.isFinite(parsedQty) && parsedQty > 0) {
+            setNovaQtd(parsedQty);
+          }
+
+          setShowModal(true);
+          initialQueryRef.current = null;
+          setSearchParams({}, { replace: true });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setFeedback({ type: 'error', message: getErrorMessage(err) });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchMovimentacoes();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey, setSearchParams]);
 
   const handleOpenModal = () => {
     setModalError('');
@@ -84,7 +129,8 @@ export function MovimentacoesPage() {
 
       setShowModal(false);
       setFeedback({ type: 'success', message: 'Movimentação registrada e estoque atualizado com sucesso!' });
-      await loadData();
+      setLoading(true);
+      setReloadKey((k) => k + 1);
     } catch (err) {
       setModalError(getErrorMessage(err));
     } finally {

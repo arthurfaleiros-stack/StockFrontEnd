@@ -5,7 +5,18 @@ import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Alert from '../../components/common/Alert';
 import { StatusBadge } from '../../components/common/Badge';
-import { Search, Plus, Filter, Trash2, Package, Tag, Building2, AlertTriangle } from 'lucide-react';
+import PrevisaoRupturaModal from '../../components/ruptura/PrevisaoRupturaModal';
+import {
+  Search,
+  Plus,
+  Filter,
+  Trash2,
+  Package,
+  Tag,
+  Building2,
+  AlertTriangle,
+  TrendingDown,
+} from 'lucide-react';
 import inventoryService from '../../api/inventory';
 import { getErrorMessage } from '../../utils/errorParser';
 
@@ -23,6 +34,8 @@ export function ProdutosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [modalError, setModalError] = useState('');
+  const [selectedRupturaProduct, setSelectedRupturaProduct] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [form, setForm] = useState({
     nome: '',
@@ -35,32 +48,47 @@ export function ProdutosPage() {
     descricao: '',
   });
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [prodRes, catRes, fornRes] = await Promise.all([
-        inventoryService.getProdutos({ limit: 100 }),
-        inventoryService.getCategorias({ limit: 100 }),
-        inventoryService.getFornecedores({ limit: 100 }),
-      ]);
-
-      const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
-      const cats = catRes?.data || (Array.isArray(catRes) ? catRes : []);
-      const forns = fornRes?.data || (Array.isArray(fornRes) ? fornRes : []);
-
-      setProdutos(prods);
-      setCategorias(cats);
-      setFornecedores(forns);
-    } catch (err) {
-      setFeedback({ type: 'danger', message: getErrorMessage(err) });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadData();
-  }, []);
+    let cancelled = false;
+
+    async function fetchAll() {
+      try {
+        const [prodRes, catRes, fornRes] = await Promise.all([
+          inventoryService.getProdutos({ limit: 100 }),
+          inventoryService.getCategorias({ limit: 100 }),
+          inventoryService.getFornecedores({ limit: 100 }),
+        ]);
+
+        if (cancelled) return;
+
+        const prods = prodRes?.data || (Array.isArray(prodRes) ? prodRes : []);
+        const cats = catRes?.data || (Array.isArray(catRes) ? catRes : []);
+        const forns = fornRes?.data || (Array.isArray(fornRes) ? fornRes : []);
+
+        setProdutos(prods);
+        setCategorias(cats);
+        setFornecedores(forns);
+      } catch (err) {
+        if (!cancelled) {
+          setFeedback({ type: 'error', message: getErrorMessage(err) });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchAll();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  const triggerReload = () => {
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  };
 
   const handleOpenModal = () => {
     setModalError('');
@@ -115,7 +143,7 @@ export function ProdutosPage() {
 
       setShowModal(false);
       setFeedback({ type: 'success', message: 'Produto cadastrado com sucesso no catálogo e estoque!' });
-      await loadData();
+      triggerReload();
     } catch (err) {
       setModalError(getErrorMessage(err));
     } finally {
@@ -130,9 +158,9 @@ export function ProdutosPage() {
     try {
       await inventoryService.deleteProduto(id);
       setFeedback({ type: 'success', message: 'Produto excluído com sucesso!' });
-      await loadData();
+      triggerReload();
     } catch (err) {
-      setFeedback({ type: 'danger', message: getErrorMessage(err) });
+      setFeedback({ type: 'error', message: getErrorMessage(err) });
     }
   };
 
@@ -217,95 +245,160 @@ export function ProdutosPage() {
         </div>
       </div>
 
-      {/* Tabela de Produtos */}
+      {/* Tabela / Cards Responsivos de Produtos */}
       <Card bodyClassName="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-[#1b2542] text-[11px] uppercase tracking-wider text-slate-400 bg-[#0c1326]">
-                <th className="py-3 px-6 font-semibold">SKU / Código</th>
-                <th className="py-3 px-6 font-semibold">Produto / Descrição</th>
-                <th className="py-3 px-6 font-semibold">Categoria</th>
-                <th className="py-3 px-6 font-semibold">Fornecedor</th>
-                <th className="py-3 px-6 font-semibold text-center">Em Estoque</th>
-                <th className="py-3 px-6 font-semibold text-center">Mínimo</th>
-                <th className="py-3 px-6 font-semibold text-center">Status</th>
-                {canDeleteProducts && (
-                  <th className="py-3 px-6 font-semibold text-center">Ações</th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#17223e]">
-              {loading ? (
-                <tr>
-                  <td colSpan={canDeleteProducts ? 8 : 7} className="py-12 text-center text-slate-400">
-                    Carregando produtos do banco de dados...
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={canDeleteProducts ? 8 : 7} className="py-12 text-center text-slate-400">
-                    Nenhum produto cadastrado correspondente aos filtros. Clique em &quot;Novo Produto&quot; para cadastrar.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((item) => {
-                  const stock = getStockStatus(item);
-                  return (
-                    <tr key={item.id} className="hover:bg-[#121c38]/60 transition-colors">
-                      <td className="py-4 px-6 font-mono text-xs text-indigo-400 font-bold">
-                        {item.codigo}
-                      </td>
-                      <td className="py-4 px-6 font-medium text-slate-100">
-                        <div className="flex flex-col">
-                          <span>{item.nome}</span>
-                          {item.codigo_barras && (
-                            <span className="text-[11px] font-mono text-slate-400">
-                              EAN: {item.codigo_barras}
-                            </span>
-                          )}
-                          {item.descricao && (
-                            <span className="text-xs text-slate-400 line-clamp-1">
-                              {item.descricao}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-6 text-xs text-slate-400">
-                        <span className="bg-[#141e3a] px-2.5 py-1 rounded-lg border border-[#1e2c54]">
-                          {item.categoria_nome || 'Sem Categoria'}
+        {loading ? (
+          <div className="py-12 text-center text-slate-400 text-sm">
+            Carregando produtos do banco de dados...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-12 px-4 text-center text-slate-400 text-sm">
+            Nenhum produto cadastrado correspondente aos filtros. Clique em &quot;Novo Produto&quot; para cadastrar.
+          </div>
+        ) : (
+          <>
+            {/* Cards Mobile (< 768px) */}
+            <div className="md:hidden divide-y divide-[#17223e]">
+              {filtered.map((item) => {
+                const stock = getStockStatus(item);
+                return (
+                  <div key={item.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-mono text-xs text-indigo-400 font-bold">
+                          {item.codigo}
                         </span>
-                      </td>
-                      <td className="py-4 px-6 text-xs text-slate-400">
-                        {item.fornecedor_nome || 'Não vinculado'}
-                      </td>
-                      <td className="py-4 px-6 text-center font-mono font-bold text-white">
-                        {item.quantidade_atual} un
-                      </td>
-                      <td className="py-4 px-6 text-center font-mono text-xs text-slate-400">
-                        {item.quantidade_minima} un
-                      </td>
-                      <td className="py-4 px-6 text-center">
-                        <StatusBadge status={stock.status} label={stock.label} />
-                      </td>
+                        <p className="font-semibold text-slate-100 text-sm truncate">
+                          {item.nome}
+                        </p>
+                      </div>
+                      <StatusBadge status={stock.status} label={stock.label} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-[#0a1020] border border-[#1b2649] rounded-xl p-3">
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">Categoria</span>
+                        <span className="text-slate-200">{item.categoria_nome || 'Sem Categoria'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">Em Estoque / Mín.</span>
+                        <span className="font-mono font-bold text-white">
+                          {item.quantidade_atual} / {item.quantidade_minima} un
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        fullWidth
+                        icon={TrendingDown}
+                        onClick={() => setSelectedRupturaProduct(item)}
+                      >
+                        Previsão de Ruptura
+                      </Button>
                       {canDeleteProducts && (
-                        <td className="py-4 px-6 text-center">
-                          <button
-                            onClick={() => handleDelete(item.id, item.nome)}
-                            title="Excluir produto"
-                            className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4 inline" />
-                          </button>
-                        </td>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item.id, item.nome)}
+                          title="Excluir produto"
+                          className="text-slate-400 hover:text-rose-400 p-2 rounded-lg border border-[#1e294b] hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Tabela Desktop (>= 768px) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[#1b2542] text-[11px] uppercase tracking-wider text-slate-400 bg-[#0c1326]">
+                    <th className="py-3 px-5 font-semibold">SKU / Código</th>
+                    <th className="py-3 px-5 font-semibold">Produto / Descrição</th>
+                    <th className="py-3 px-4 font-semibold">Categoria</th>
+                    <th className="py-3 px-4 font-semibold">Fornecedor</th>
+                    <th className="py-3 px-4 font-semibold text-center">Em Estoque</th>
+                    <th className="py-3 px-4 font-semibold text-center">Mínimo</th>
+                    <th className="py-3 px-4 font-semibold text-center">Status</th>
+                    <th className="py-3 px-5 font-semibold text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#17223e]">
+                  {filtered.map((item) => {
+                    const stock = getStockStatus(item);
+                    return (
+                      <tr key={item.id} className="hover:bg-[#121c38]/60 transition-colors">
+                        <td className="py-4 px-5 font-mono text-xs text-indigo-400 font-bold">
+                          {item.codigo}
+                        </td>
+                        <td className="py-4 px-5 font-medium text-slate-100">
+                          <div className="flex flex-col">
+                            <span>{item.nome}</span>
+                            {item.codigo_barras && (
+                              <span className="text-[11px] font-mono text-slate-400">
+                                EAN: {item.codigo_barras}
+                              </span>
+                            )}
+                            {item.descricao && (
+                              <span className="text-xs text-slate-400 line-clamp-1">
+                                {item.descricao}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-xs text-slate-400">
+                          <span className="bg-[#141e3a] px-2.5 py-1 rounded-lg border border-[#1e2c54]">
+                            {item.categoria_nome || 'Sem Categoria'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4 text-xs text-slate-400">
+                          {item.fornecedor_nome || 'Não vinculado'}
+                        </td>
+                        <td className="py-4 px-4 text-center font-mono font-bold text-white">
+                          {item.quantidade_atual} un
+                        </td>
+                        <td className="py-4 px-4 text-center font-mono text-xs text-slate-400">
+                          {item.quantidade_minima} un
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <StatusBadge status={stock.status} label={stock.label} />
+                        </td>
+                        <td className="py-4 px-5">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={TrendingDown}
+                              onClick={() => setSelectedRupturaProduct(item)}
+                            >
+                              Previsão de Ruptura
+                            </Button>
+                            {canDeleteProducts && (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(item.id, item.nome)}
+                                title="Excluir produto"
+                                className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4 inline" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </Card>
 
       {/* Modal de Cadastro de Produto */}
@@ -473,6 +566,15 @@ export function ProdutosPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal de Previsão de Ruptura por Produto */}
+      {selectedRupturaProduct && (
+        <PrevisaoRupturaModal
+          produtoId={selectedRupturaProduct.id}
+          initialProduct={selectedRupturaProduct}
+          onClose={() => setSelectedRupturaProduct(null)}
+        />
       )}
     </div>
   );

@@ -20,6 +20,7 @@ import CategoriasPage from './pages/categorias/CategoriasPage';
 import FornecedoresPage from './pages/fornecedores/FornecedoresPage';
 import HistoricoPage from './pages/historico/HistoricoPage';
 import UsuariosPage from './pages/usuarios/UsuariosPage';
+import PrevisaoRupturaPage from './pages/ruptura/PrevisaoRupturaPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 export function App() {
@@ -46,6 +47,14 @@ export function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/produtos" element={<ProdutosPage />} />
             <Route path="/movimentacoes" element={<MovimentacoesPage />} />
+            <Route
+              path="/previsao-ruptura"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN', 'GERENTE', 'OPERADOR']}>
+                  <PrevisaoRupturaPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/categorias"
               element={

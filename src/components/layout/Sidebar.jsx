@@ -13,6 +13,7 @@ import {
   LogOut,
   Boxes,
   X,
+  TrendingDown,
 } from 'lucide-react';
 
 export function Sidebar({ isOpen, onClose }) {
@@ -36,6 +37,12 @@ export function Sidebar({ isOpen, onClose }) {
       label: 'Movimentações',
       path: '/movimentacoes',
       icon: ArrowLeftRight,
+      roles: ['ADMIN', 'GERENTE', 'OPERADOR'],
+    },
+    {
+      label: 'Previsão de Ruptura',
+      path: '/previsao-ruptura',
+      icon: TrendingDown,
       roles: ['ADMIN', 'GERENTE', 'OPERADOR'],
     },
     {
