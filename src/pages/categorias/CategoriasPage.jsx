@@ -21,22 +21,33 @@ export function CategoriasPage() {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
 
-  const loadCategorias = async () => {
-    try {
-      setLoading(true);
-      const res = await inventoryService.getCategorias({ limit: 100 });
-      const items = res?.data || (Array.isArray(res) ? res : []);
-      setCategorias(items);
-    } catch (err) {
-      setFeedback({ type: 'danger', message: getErrorMessage(err) });
-    } finally {
-      setLoading(false);
-    }
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const loadCategorias = () => {
+    setLoading(true);
+    setReloadKey((k) => k + 1);
   };
 
   useEffect(() => {
-    loadCategorias();
-  }, []);
+    let cancelled = false;
+    async function fetchCategorias() {
+      try {
+        const res = await inventoryService.getCategorias({ limit: 100 });
+        const items = res?.data || (Array.isArray(res) ? res : []);
+        if (!cancelled) setCategorias(items);
+      } catch (err) {
+        if (!cancelled) {
+          setFeedback({ type: 'danger', message: getErrorMessage(err) });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchCategorias();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

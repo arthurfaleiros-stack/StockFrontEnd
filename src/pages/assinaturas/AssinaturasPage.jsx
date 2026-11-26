@@ -3,18 +3,19 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Alert from '../../components/common/Alert';
-import { RoleBadge, StatusBadge } from '../../components/common/Badge';
-import { Search, CreditCard, UserPlus, Calendar } from 'lucide-react';
+import { StatusBadge } from '../../components/common/Badge';
+import { Search, CreditCard, UserPlus } from 'lucide-react';
 import inventoryService from '../../api/inventory';
 import { getErrorMessage } from '../../utils/errorParser';
 import { useAuth } from '../../context/useAuth';
 
 export function AssinaturasPage() {
-  const { hasRole, user } = useAuth();
+  const { hasRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [assinaturas, setAssinaturas] = useState([]);
   const [minhaAssinatura, setMinhaAssinatura] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -29,28 +30,38 @@ export function AssinaturasPage() {
 
   const canManage = hasRole(['ADMIN']);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-
-      if (canManage) {
-        const res = await inventoryService.getAssinaturas({ limit: 100 });
-        const items = res?.data || (Array.isArray(res) ? res : []);
-        setAssinaturas(items);
-      } else {
-        const res = await inventoryService.getMinhaAssinatura();
-        setMinhaAssinatura(res);
-      }
-    } catch (err) {
-      setFeedback({ type: 'danger', message: getErrorMessage(err) });
-    } finally {
-      setLoading(false);
-    }
+  const loadData = () => {
+    setLoading(true);
+    setReloadKey((k) => k + 1);
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    let cancelled = false;
+
+    async function fetchData() {
+      try {
+        if (canManage) {
+          const res = await inventoryService.getAssinaturas({ limit: 100 });
+          const items = res?.data || (Array.isArray(res) ? res : []);
+          if (!cancelled) setAssinaturas(items);
+        } else {
+          const res = await inventoryService.getMinhaAssinatura();
+          if (!cancelled) setMinhaAssinatura(res);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setFeedback({ type: 'danger', message: getErrorMessage(err) });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchData();
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, reloadKey]);
 
   const handleCreate = async (e) => {
     e.preventDefault();

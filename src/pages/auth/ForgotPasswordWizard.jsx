@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../../api/auth';
 import { getErrorMessage } from '../../utils/errorParser';
@@ -20,10 +20,13 @@ export function ForgotPasswordWizard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const urlToken = searchParams.get('token') || searchParams.get('codigo');
+  const urlEmail = searchParams.get('email');
+
   // Estados do formulário
-  const [step, setStep] = useState(1);
-  const [email, setEmail] = useState('');
-  const [codigo, setCodigo] = useState(''); // Começa ESTRITAMENTE VAZIO, sem autofill
+  const [step, setStep] = useState(() => (urlToken ? 2 : 1));
+  const [email, setEmail] = useState(() => urlEmail || '');
+  const [codigo, setCodigo] = useState(() => (urlToken ? urlToken.trim() : '')); // Começa ESTRITAMENTE VAZIO quando sem link
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
 
@@ -34,23 +37,10 @@ export function ForgotPasswordWizard() {
   // Estados de controle
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
-  const [infoMessage, setInfoMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState(() =>
+    urlToken ? 'Código de verificação carregado automaticamente do link! Defina sua nova senha.' : ''
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Auto-preenchimento caso o usuário clique no link recebido por e-mail
-  useEffect(() => {
-    const urlToken = searchParams.get('token') || searchParams.get('codigo');
-    const urlEmail = searchParams.get('email');
-    if (urlEmail) {
-      setEmail(urlEmail);
-    }
-    if (urlToken) {
-      const clean = urlToken.trim();
-      setCodigo(clean);
-      setStep(2);
-      setInfoMessage('Código de verificação carregado automaticamente do link! Defina sua nova senha.');
-    }
-  }, [searchParams]);
 
   // Validação da Etapa 1 (E-mail)
   function validateStep1() {
